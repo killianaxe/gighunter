@@ -1,6 +1,6 @@
 # Orbit — Project Status
 
-_Last updated: 2026-08-16_
+_Last updated: 2026-08-18_
 
 ## What's completed
 
@@ -8,47 +8,69 @@ _Last updated: 2026-08-16_
 Full README "production architecture" implemented and wired to a live UI: source connectors → normalizer/dedupe → matcher (0–100 score) → draft agent (tailors your real resume bullets to each JD, no fabrication) → review/approve gateway that only ever opens the real posting URL for you to submit yourself. Nothing auto-submits anywhere. Every scan/draft/approval is logged to `audit_log`.
 
 - **Backend**: Fastify + better-sqlite3, `server/` — schema, pipeline, routes, scheduler (polls every minute for any source whose cadence has elapsed).
-- **Frontend**: `public/` — real data end-to-end, no more mock/fake content. Rebranded: Red Shift Cybersecurity shield as the sidebar mark + favicon (doubled in size per your request — 52px mark / 46px text), warm red-orange-pink accent palette replacing the original lime/purple, product name settled on **Orbit**.
-- **Your real profile** is loaded in `server/profile.json`, reconciled from your three resume/CV files: name, 12 core skills, $140k–$190k salary range, Remote as the active location (7 other candidate cities documented in the file under `_locationPresets_editToActivate` for you to activate later), and 8 factual accomplishment bullets used for tailoring.
+- **Frontend**: `public/` — real data end-to-end. Red Shift Cybersecurity shield as the sidebar mark + favicon, warm red-orange-pink accent palette, product name **Orbit**.
+- **Your real profile** is loaded in `server/profile.json` (gitignored) — name, 12 core skills, $140k–$190k salary range, Remote active, 8 factual accomplishment bullets used for tailoring.
 
 ### v2 Phase 1 — capability-flagged connectors (done, verified live)
-Per your roadmap: Adzuna, Himalayas, and USAJOBS added alongside the existing Remotive/RSS connectors, all API-first (no scraping), each advertising machine-readable capabilities (search/filter/fullJd/salary/remote/contractType/applicationUrl/applicationApi/authRequired/registrationRequired/cost/rateLimit/terms) via `GET /api/sources/capabilities`.
+Adzuna, Himalayas, and USAJOBS alongside Remotive/RSS, all API-first (no scraping), each advertising machine-readable capabilities via `GET /api/sources/capabilities`. All four live-tested against real credentials and confirmed mapping title/company/location/salary/URL correctly.
 
-- **Adzuna** — live-tested with your real API credentials (in `server/.env`). Confirmed real listings ingesting with correct title/company/location/salary/URL mapping.
-- **Himalayas** — no key needed, live-tested. Confirmed real listings ingesting correctly.
-- **USAJOBS** — live-tested with your real API key + registered email (`server/.env`). Field mapping (`SearchResult.SearchResultItems[].MatchedObjectDescriptor`) confirmed correct against the raw API — 23 real cybersecurity postings ingested (title/company/location/salary/URL all correct), e.g. "IT Cybersecurity Specialist" at $89.5k–$145.5k. Note: the API is picky about phrasing — "penetration tester" returned zero federal listings (that's a real, empty result, not a bug — federal titles rarely use that exact phrase), while "cybersecurity" returned 812 total matches. Worth keeping in mind when picking USAJOBS query terms.
-- `sources.type` schema constraint was migrated (old CHECK dropped, rebuilt table in place) — confirmed your existing Remotive source survived with its original `id` intact, zero data loss.
-- Add-source flow in the UI now asks for a type first (remotive/himalayas/adzuna/usajobs/rss), then the query/URL.
-
-**Live scan right now**: all 4 API-based sources active and verified (Remotive, Himalayas, Adzuna, USAJOBS), 81 real jobs ingested, top match scoring 70% ("Sr. Systems Engineer" at Computer World Services Corp, $145k–$155k, remote). Phase 1 is fully closed out — every connector has ingested and correctly mapped real data at least once.
+Note: USAJOBS is picky about phrasing — "penetration tester" returns zero federal listings (a real empty result, not a bug), while "cybersecurity" returned 812.
 
 ### Matching refinements + full resume export (done, verified live)
+- **Exclusion filtering**: India and Level 1 exclusions added. Fixed a real false positive — senior JDs mentioning "Level 1/2/3" support tiers were zeroing out strong matches, so "Level N"/"Tier N" terms are now scoped to the job **title** only. See `server/pipeline/match.ts`.
+- **`POST /api/rescore`** — re-scores every ingested job against the current profile without re-polling.
+- **Full multi-job-history resume export**: `GET /api/applications/:id/resume.docx` generates a real resume — contact header, tailored summary, 5 work-history entries with bullets ranked per-role by JD keyword overlap, Additional Experience, Certifications, Education.
 
-- **Exclusion filtering fixed and extended**: added India (location) and Level 1 (title/seniority) exclusions per your request, plus a broader "intern" catch. Caught and fixed a real false-positive during verification — senior job descriptions that mention "Level 1/2/3" support tiers (e.g. "mentors Level 1 and Level 2 engineers") were wrongly zeroing out strong matches, since the check scanned the full description. Fixed by scoping "Level N"/"Tier N"-style terms to the job **title** only, while other exclusions (unpaid, commission-only, india) still check the full text. See `server/pipeline/match.ts`.
-- **New `POST /api/rescore`** — re-scores every already-ingested job against your current profile without re-polling the external APIs. Use this after editing `server/profile.json` and running `npm run seed`.
-- **Full multi-job-history resume export**: `GET /api/applications/:id/resume.docx` now generates a real resume, not just a highlights pitch — contact header (email/phone/LinkedIn/location), tailored summary, **5 full work-history entries** (Kirkham IronTech, Red Shift Cybersecurity, Intras Cloud Services, NetStandard, VMware SRM/J&J) each with real employer/title/dates and up to 5 bullets **ranked per-role** by JD keyword overlap (verified: a cybersecurity-titled posting surfaced different bullets per role than a general systems-engineer posting — confirmed via two side-by-side test drafts), an Additional Experience section condensing your older roles (1999–2022) the same way your own source resume does, plus Certifications and Education. Click "Download .docx" in the Review dialog.
-  - Contact info confirmed with you: cumberland25@hotmail.com, 205-421-6244, LinkedIn, Fort Smith AR.
-  - **Known data inconsistency, not resolved — worth your review**: your source resumes disagree on whether Kirkham IronTech is current ("Present," used here) or ended December 2025, and NetStandard's dates (2019–2021) overlap with Intras Cloud Services' (2018–2023). Both taken as literally stated in the most complete source document. Check `server/profile.json`'s `workHistory` section and correct if needed, then `npm run seed`.
+### Session of 2026-08-18 — cleanup, full UI, GitHub, Telegram
+
+**`auto/` workspace repaired (was blocking the whole repo)**
+- `auto/package.json` had invalid JSON (stray double comma) — this broke `npm install`/`npm audit`/`--workspaces` at the **repo root**, not just in `auto/`. Fixed, plus added the documented-but-missing `start:scheduler` script.
+- Root `build` script ended in a dangling `npm run ` — simplified to `tsc`.
+- **Auto-start simplified to native WSL**: `ensure-orbit.ts` no longer hops through `wsl.exe`; it spawns `npm run dev` directly. `ORBIT_WSL_PROJECT_DIR` → `ORBIT_PROJECT_DIR`, defaulting to the parent dir. Verified end-to-end: the scheduler cold-starts Orbit and completes a cycle.
+- Created the missing `auto/.env.example`; fixed stale `D:\...` and `../gighunter` path references.
+- Blank-env-var bug: `ORBIT_PROJECT_DIR=` (empty) defeated the `??` default, so `npm run dev` ran in the wrong directory. Config now treats blank as unset.
+
+**Dependencies — `npm audit` now reports 0 vulnerabilities**
+- Removed `bcrypt`/`@types/bcrypt` — never imported anywhere, and the sole source of a critical `node-tar` chain.
+- Upgraded `@fastify/static` 8 → 10 (3 high-severity path-traversal advisories). Server verified serving UI + API after the bump.
+
+**All six sidebar links are now real pages** (previously Pipeline, Documents, and Agent settings were dead anchors with no matching element):
+- **Documents** — `GET /api/documents` lists whatever sits in `server/data/documents/` (name, size, date, view link). Read-only mirror of that folder; Orbit never edits your source files. 31 resume/CV files currently on file.
+- **Agent settings** — `GET/PATCH /api/profile` edits salary range, target locations (with quick-add presets), exclusions, and skills, then re-scores every ingested job on save. Previously these were only editable by hand-editing `profile.json` + `npm run seed`.
+- **Pipeline** — `GET /api/pipeline` buckets every job into New / Matched / Drafted / Approved. Counts verified consistent with `/api/overview`.
+
+**Telegram notifier (`server/notify/telegram.ts`) — live and verified**
+- Sends **one batched message** after a scheduled scan when jobs at/above a configurable threshold haven't been announced yet.
+- Configurable in Agent settings: on/off toggle, threshold field, and a **Send test** button (`POST /api/profile/test-notification`).
+- **Notification state lives on `jobs.notified_at`, not `matches`** — `rescoreAll()` deletes and rebuilds every match row, so storing it there would clear the flag on every settings save and re-announce the entire backlog.
+- Existing jobs were backfilled as notified by the migration, so enabling it stays quiet.
+- Send failures leave `notified_at` unset so the next scan retries — verified by forcing a failure.
+- Bot is **@PymonIIBot**. Credentials in `server/.env` (gitignored).
+
+**Now on GitHub**: <https://github.com/killianaxe/gighunter> (public). `.gitignore` excludes `server/.env`, `server/profile.json`, `server/data/`, `auto/.env`, `auto/downloads/`, `auto/logs/`, `node_modules/`, `dist/`. Verified no credentials or personal data in any commit.
+
+**Current live state**: 260 jobs, 16 active sources (4 each of Adzuna/Himalayas/Remotive/USAJOBS), 15 applications (10 approved, 5 drafted), top match 70%, notifier enabled at a 65% threshold.
 
 ## What's NOT implemented yet (later phases, by design)
 
 - **Phase 2**: Jooble, Remote OK, Jobicy, Arbeitnow, The Muse
-- **Phase 3**: Greenhouse/Lever/SmartRecruiters/Ashby/Workday ATS-adapter layer with employer-side application handoff
+- **Phase 3**: Greenhouse/Lever/SmartRecruiters/Ashby/Workday ATS-adapter layer
 - **Phase 4**: Upwork (contract/freelance lane)
 - Separate contract/permanent/temporary weighting in the matcher (currently one undifferentiated score)
-- The expanded search-family keyword list from your roadmap (Cloud Security Engineer, IAM/Entra Engineer, AI Infrastructure Engineer, etc.) — right now every source just searches "Active Directory"; broadening this is profile/source config work, not connector work
-- A UI for the capability flags (the data exists at `GET /api/sources/capabilities`, nothing renders it yet)
+- **Two-way Telegram control** (`/find`, `/promote` from your phone). Would need a polling loop + command router, and a **dedicated second bot** — see Known Issues.
+- A UI for the capability flags (data exists at `GET /api/sources/capabilities`, nothing renders it)
 - Auth / multi-user (intentionally deferred since v1, still single local user)
 
-## Known issues (minor, non-blocking)
+## Known issues
 
-- One Himalayas listing displayed a `$0k–$0k` salary tag — a raw-data quirk from that specific posting (values too small to be annual USD), not a parsing bug. Cosmetic only.
-- The exact same Adzuna credentials now in `server/.env` are **also still sitting in plaintext** in `ai-job-hunting-agent-prompts.md` at the project root, left over from earlier planning. Not urgent (free-tier key, low blast radius) but worth scrubbing from that file if it's ever shared or committed anywhere.
-- `npm audit` reported some vulnerabilities in transitive build tooling (not runtime) dependencies during the original `npm install` — not investigated, low priority for a local single-user tool.
+- **Something else is already polling @PymonIIBot.** It replies to messages with "⚠️ The model provider failed after retries" — an LLM-gateway error from another service (likely the "Hermes/Forge" system described in `ai-job-hunting-agent-prompts.md`, which was **never built here**). Orbit is send-only and coexists fine, but: (a) your job alerts land in the same chat as that bot's errors, and (b) any future two-way control needs a separate bot, since Telegram allows only one poller per token.
+- `ai-job-hunting-agent-prompts.md` describes a **different system** ("Forge" — Python, VPS, 4 agent personas, Hermes gateway) than what exists here (Orbit — TypeScript, local, no LLM calls). It's a spec that was never implemented; don't mistake it for documentation of this codebase.
+- One Himalayas listing showed a `$0k–$0k` salary tag — a raw-data quirk from that posting, cosmetic only.
+- **Data inconsistency worth your review**: your source resumes disagree on whether Kirkham IronTech is current ("Present," used here) or ended December 2025, and NetStandard's dates (2019–2021) overlap Intras Cloud Services' (2018–2023). Check `workHistory` in `server/profile.json`, correct if needed, then `npm run seed`.
 
-## Exact next step for tomorrow
+## Exact next step
 
-Decide whether to broaden the search-family keywords (three of four sources currently search "Active Directory", USAJOBS searches "cybersecurity") before moving on to Phase 2 connectors — more sources searching the same one or two terms adds redundancy, not variety. Your roadmap's full keyword list (Cloud Security Engineer, IAM/Entra Engineer, AI Infrastructure Engineer, etc.) hasn't been wired in yet; that's the natural next unit of work, either as multiple sources per connector or a smarter multi-keyword query strategy.
+Broaden the search-family keywords. All 16 sources still search a narrow set of terms; your roadmap's full list (Cloud Security Engineer, IAM/Entra Engineer, AI Infrastructure Engineer, etc.) isn't wired in. With Agent settings now editable in the UI, the skills list is easy to tune — but **source queries** are still set per-source at creation time, so this means either adding more sources or building a multi-keyword query strategy.
 
 ## How to pick this back up
 
@@ -56,4 +78,10 @@ Decide whether to broaden the search-family keywords (three of four sources curr
 cd /home/killian/code/gighunter
 npm run dev
 ```
-Then open `http://localhost:3000`. Your profile, all 4 sources, and 81 already-scanned jobs are all persisted in `server/data/orbit.db` — nothing needs to be re-seeded.
+Then open <http://localhost:3000>. Profile, sources, and scanned jobs all persist in `server/data/orbit.db` — nothing needs re-seeding.
+
+To run the MCP wrapper / auto-drafter:
+```bash
+npm run mcp                      # MCP server for agent access
+node auto/dist/scheduler.js      # auto-drafts strong matches, saves .docx resumes
+```
