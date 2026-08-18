@@ -2,6 +2,7 @@ import { db } from './db/index.js';
 import { pollSources } from './pipeline/poll.js';
 import { matchUnscoredJobs } from './pipeline/match.js';
 import { getDefaultCandidate } from './db/candidates.js';
+import { notifyStrongMatches } from './notify/telegram.js';
 import type { SourceRow } from './db/types.js';
 
 const CHECK_INTERVAL_MS = 60_000;
@@ -26,11 +27,22 @@ async function runDueScan(): Promise<void> {
   const sources = dueSources();
   if (sources.length === 0) return;
 
+  const candidate = getDefaultCandidate();
+
   try {
     await pollSources(sources);
-    matchUnscoredJobs(getDefaultCandidate());
+    matchUnscoredJobs(candidate);
   } catch (err) {
     console.error('Scheduled scan failed:', err instanceof Error ? err.message : err);
+  }
+
+  // Separate try/catch: notifying is a side effect of scanning, never a precondition for it.
+  // A Telegram outage must not stop jobs being ingested and scored.
+  try {
+    const result = await notifyStrongMatches(candidate.id);
+    if (result.error) console.error('Telegram notification failed:', result.error);
+  } catch (err) {
+    console.error('Telegram notification failed:', err instanceof Error ? err.message : err);
   }
 }
 

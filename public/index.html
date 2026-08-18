@@ -93,6 +93,17 @@
             <div class="tag-input-row"><input type="text" id="skills-input" placeholder="Add a skill" /><button type="button" id="skills-add">Add</button></div>
           </div>
         </div>
+        <div class="notify-block">
+          <div class="notify-head">
+            <label class="notify-toggle"><input type="checkbox" id="notify-enabled" /> <span>Telegram notifications</span></label>
+            <button type="button" class="quiet-btn light" id="notify-test">Send test</button>
+          </div>
+          <p class="notify-hint" id="notify-hint">Sends one batched message when a scheduled scan turns up matches you haven't seen yet.</p>
+          <div class="notify-threshold">
+            <label for="notify-threshold">Notify at or above</label>
+            <input type="number" id="notify-threshold" min="0" max="100" step="1" /><span>% match</span>
+          </div>
+        </div>
         <button class="primary" id="settings-save">Save &amp; re-score <span>→</span></button>
       </section>
       <section class="safety"><span>✓</span><div><strong>Application safeguard is on</strong><p>Scout drafts tailored applications and queues them for your approval before anything is submitted.</p></div><a href="#settings">Configure →</a></section>

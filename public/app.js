@@ -37,6 +37,10 @@ const skillsInput = document.querySelector('#skills-input');
 const skillsAddBtn = document.querySelector('#skills-add');
 const settingsSaveBtn = document.querySelector('#settings-save');
 const settingsStatus = document.querySelector('#settings-status');
+const notifyEnabledEl = document.querySelector('#notify-enabled');
+const notifyThresholdEl = document.querySelector('#notify-threshold');
+const notifyTestBtn = document.querySelector('#notify-test');
+const notifyHint = document.querySelector('#notify-hint');
 
 const profileName = document.querySelector('#profile-name');
 const profileAvatar = document.querySelector('#profile-avatar');
@@ -397,9 +401,26 @@ function renderLocationPresets() {
   }
 }
 
+const NOTIFY_DEFAULT_HINT =
+  "Sends one batched message when a scheduled scan turns up matches you haven't seen yet.";
+
+function renderNotifySettings() {
+  notifyEnabledEl.checked = Boolean(profileDraft.notifyEnabled);
+  notifyThresholdEl.value = profileDraft.notifyThreshold ?? 70;
+
+  const configured = profileDraft.telegramConfigured;
+  notifyEnabledEl.disabled = !configured;
+  notifyTestBtn.disabled = !configured;
+  notifyHint.classList.toggle('warn', !configured);
+  notifyHint.textContent = configured
+    ? NOTIFY_DEFAULT_HINT
+    : 'Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in server/.env to enable notifications.';
+}
+
 function renderSettings() {
   settingsSalaryMin.value = profileDraft.salaryMin ?? '';
   settingsSalaryMax.value = profileDraft.salaryMax ?? '';
+  renderNotifySettings();
   renderTagEditor(locationsEditor, profileDraft.locations, item => {
     profileDraft.locations = profileDraft.locations.filter(l => l !== item);
     renderSettings();
@@ -565,6 +586,8 @@ settingsSaveBtn.addEventListener('click', async () => {
       locations: profileDraft.locations,
       exclusions: profileDraft.exclusions,
       skills: profileDraft.skills,
+      notifyEnabled: notifyEnabledEl.checked,
+      notifyThreshold: notifyThresholdEl.value === '' ? 70 : Number(notifyThresholdEl.value),
     });
     profileDraft = { ...updated };
     renderSettings();
@@ -575,6 +598,24 @@ settingsSaveBtn.addEventListener('click', async () => {
     alert(`Could not save settings: ${err.message}`);
   } finally {
     settingsSaveBtn.disabled = false;
+  }
+});
+
+notifyTestBtn.addEventListener('click', async () => {
+  notifyTestBtn.disabled = true;
+  const original = notifyTestBtn.textContent;
+  notifyTestBtn.textContent = 'Sending…';
+  try {
+    await postJSON('/api/profile/test-notification');
+    notifyTestBtn.textContent = 'Sent ✓';
+  } catch (err) {
+    notifyTestBtn.textContent = 'Failed';
+    alert(`Test message failed: ${err.message}`);
+  } finally {
+    setTimeout(() => {
+      notifyTestBtn.textContent = original;
+      notifyTestBtn.disabled = false;
+    }, 2000);
   }
 });
 

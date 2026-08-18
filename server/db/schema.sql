@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   salary_max INTEGER,
   posted_at TEXT,
   normalized_key TEXT NOT NULL UNIQUE,
+  -- Set once a job has been announced by the notifier. Deliberately on jobs, not matches:
+  -- rescoreAll() deletes and rebuilds every match row, which would clear the flag and
+  -- re-announce the entire backlog on the next scan.
+  notified_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -75,6 +79,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
   action TEXT NOT NULL,
   detail TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Key/value app settings (notifier config). Unlike `candidates`, these describe how Orbit
+-- behaves rather than who the candidate is, so they get their own table.
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source_id);

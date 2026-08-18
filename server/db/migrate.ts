@@ -60,3 +60,19 @@ export function migrateCandidatesColumns(db: Database.Database): void {
     }
   }
 }
+
+/**
+ * Adds jobs.notified_at to existing databases. New tables are handled by schema.sql's
+ * CREATE TABLE IF NOT EXISTS, but that statement is a no-op against an existing table,
+ * so added columns always need an explicit ALTER here.
+ *
+ * Backfilled to datetime('now') for every job already on file: those predate the notifier,
+ * and announcing a few hundred historical matches on first launch would be worse than useless.
+ */
+export function migrateJobsColumns(db: Database.Database): void {
+  const existing = new Set((db.prepare(`PRAGMA table_info(jobs)`).all() as { name: string }[]).map(c => c.name));
+  if (existing.has('notified_at')) return;
+
+  db.exec(`ALTER TABLE jobs ADD COLUMN notified_at TEXT`);
+  db.exec(`UPDATE jobs SET notified_at = datetime('now')`);
+}
