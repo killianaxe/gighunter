@@ -104,6 +104,15 @@
             <input type="number" id="notify-threshold" min="0" max="100" step="1" /><span>% match</span>
           </div>
         </div>
+        <div class="notify-block">
+          <div class="notify-head"><label>Scoring sensitivity</label></div>
+          <p class="notify-hint">Lower numbers score jobs higher. <b>Domain</b> is how many related terms (e.g. vSphere, ESXi, vCenter) a posting needs for a full virtualization match. <b>Profile</b> is the same for your flat skills list. The better of the two is used.</p>
+          <div class="tuning-row">
+            <div><label for="skill-family-target">Domain terms</label><input type="number" id="skill-family-target" min="1" max="20" step="1" /></div>
+            <div><label for="skill-target">Profile skills</label><input type="number" id="skill-target" min="1" max="20" step="1" /></div>
+          </div>
+          <div class="distribution" id="distribution"></div>
+        </div>
         <button class="primary" id="settings-save">Save &amp; re-score <span>→</span></button>
       </section>
       <section class="safety"><span>✓</span><div><strong>Application safeguard is on</strong><p>Scout drafts tailored applications and queues them for your approval before anything is submitted.</p></div><a href="#settings">Configure →</a></section>

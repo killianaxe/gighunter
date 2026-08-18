@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { getDefaultCandidate } from '../db/candidates.js';
 import { logAudit } from '../db/audit.js';
 import { rescoreAll } from '../pipeline/match.js';
-import { getNotificationSettings, setNotificationSettings } from '../db/settings.js';
+import { getAppSettings, setAppSettings } from '../db/settings.js';
 import { sendTestMessage } from '../notify/telegram.js';
 
 // Mirrors profile.json's `_locationPresets_editToActivate` — quick-add suggestions for the
@@ -26,8 +26,20 @@ function cleanStringList(value: unknown): string[] | null {
   return [...new Set(cleaned)];
 }
 
+/**
+ * Score histogram, so the settings UI can show the effect of a tuning change immediately.
+ * Tuning a threshold blind is guesswork — this closes the feedback loop.
+ */
+function scoreDistribution(candidateId: string) {
+  const at = (min: number) =>
+    (db.prepare(`SELECT COUNT(*) AS n FROM matches WHERE candidate_id = ? AND score >= ?`).get(candidateId, min) as {
+      n: number;
+    }).n;
+  return { total: at(0), at55: at(55), at65: at(65), at75: at(75), at85: at(85), at90: at(90) };
+}
+
 function serializeProfile(candidate: ReturnType<typeof getDefaultCandidate>, rescored?: number) {
-  const notifications = getNotificationSettings();
+  const notifications = getAppSettings();
   return {
     salaryMin: candidate.salaryMin,
     salaryMax: candidate.salaryMax,
@@ -39,6 +51,7 @@ function serializeProfile(candidate: ReturnType<typeof getDefaultCandidate>, res
     // Whether the bot credentials exist at all — lets the UI explain a disabled notifier
     // without ever exposing the token itself.
     telegramConfigured: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+    distribution: scoreDistribution(candidate.id),
     ...(rescored === undefined ? {} : { rescored }),
   };
 }
@@ -58,6 +71,8 @@ export async function profileRoutes(app: FastifyInstance) {
       skills?: unknown;
       notifyEnabled?: boolean;
       notifyThreshold?: number;
+      skillTarget?: number;
+      skillFamilyTarget?: number;
     };
 
     const salaryMin = 'salaryMin' in body ? body.salaryMin ?? null : candidate.salaryMin;
@@ -79,14 +94,24 @@ export async function profileRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: 'notifyThreshold must be a number between 0 and 100' });
       }
     }
+    for (const key of ['skillTarget', 'skillFamilyTarget'] as const) {
+      if (body[key] === undefined) continue;
+      const value = Number(body[key]);
+      // A zero target would divide every job to a perfect score, so the floor is 1.
+      if (!Number.isFinite(value) || value < 1 || value > 20) {
+        return reply.code(400).send({ error: `${key} must be a number between 1 and 20` });
+      }
+    }
 
     db.prepare(
       `UPDATE candidates SET salary_min = ?, salary_max = ?, locations_json = ?, exclusions_json = ?, skills_json = ? WHERE id = ?`
     ).run(salaryMin, salaryMax, JSON.stringify(locations), JSON.stringify(exclusions), JSON.stringify(skills), candidate.id);
 
-    setNotificationSettings({
+    setAppSettings({
       ...(body.notifyEnabled === undefined ? {} : { notifyEnabled: Boolean(body.notifyEnabled) }),
       ...(body.notifyThreshold === undefined ? {} : { notifyThreshold: Number(body.notifyThreshold) }),
+      ...(body.skillTarget === undefined ? {} : { skillTarget: Number(body.skillTarget) }),
+      ...(body.skillFamilyTarget === undefined ? {} : { skillFamilyTarget: Number(body.skillFamilyTarget) }),
     });
 
     logAudit('candidate', candidate.id, 'profile_updated');

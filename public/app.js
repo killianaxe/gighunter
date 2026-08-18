@@ -41,6 +41,9 @@ const notifyEnabledEl = document.querySelector('#notify-enabled');
 const notifyThresholdEl = document.querySelector('#notify-threshold');
 const notifyTestBtn = document.querySelector('#notify-test');
 const notifyHint = document.querySelector('#notify-hint');
+const skillTargetEl = document.querySelector('#skill-target');
+const skillFamilyTargetEl = document.querySelector('#skill-family-target');
+const distributionEl = document.querySelector('#distribution');
 
 const profileName = document.querySelector('#profile-name');
 const profileAvatar = document.querySelector('#profile-avatar');
@@ -404,9 +407,42 @@ function renderLocationPresets() {
 const NOTIFY_DEFAULT_HINT =
   "Sends one batched message when a scheduled scan turns up matches you haven't seen yet.";
 
+/** Shows how many jobs clear each cut-off, highlighting the band your threshold sits in. */
+function renderDistribution() {
+  const d = profileDraft.distribution;
+  distributionEl.innerHTML = '';
+  if (!d) return;
+
+  const threshold = Number(notifyThresholdEl.value || profileDraft.notifyThreshold || 0);
+  const bands = [
+    { label: '≥55%', min: 55, n: d.at55 },
+    { label: '≥65%', min: 65, n: d.at65 },
+    { label: '≥75%', min: 75, n: d.at75 },
+    { label: '≥85%', min: 85, n: d.at85 },
+    { label: '≥90%', min: 90, n: d.at90 },
+  ];
+  // The active band is the tightest cut-off your threshold still clears.
+  const active = [...bands].reverse().find(b => threshold >= b.min);
+
+  const total = document.createElement('span');
+  total.className = 'dist-chip';
+  total.innerHTML = `<b>${d.total}</b> jobs scored`;
+  distributionEl.append(total);
+
+  for (const band of bands) {
+    const chip = document.createElement('span');
+    chip.className = `dist-chip${active && band.min === active.min ? ' active' : ''}`;
+    chip.innerHTML = `${band.label} <b>${band.n}</b>`;
+    distributionEl.append(chip);
+  }
+}
+
 function renderNotifySettings() {
   notifyEnabledEl.checked = Boolean(profileDraft.notifyEnabled);
   notifyThresholdEl.value = profileDraft.notifyThreshold ?? 70;
+  skillTargetEl.value = profileDraft.skillTarget ?? 5;
+  skillFamilyTargetEl.value = profileDraft.skillFamilyTarget ?? 4;
+  renderDistribution();
 
   const configured = profileDraft.telegramConfigured;
   notifyEnabledEl.disabled = !configured;
@@ -588,6 +624,8 @@ settingsSaveBtn.addEventListener('click', async () => {
       skills: profileDraft.skills,
       notifyEnabled: notifyEnabledEl.checked,
       notifyThreshold: notifyThresholdEl.value === '' ? 70 : Number(notifyThresholdEl.value),
+      skillTarget: skillTargetEl.value === '' ? 5 : Number(skillTargetEl.value),
+      skillFamilyTarget: skillFamilyTargetEl.value === '' ? 4 : Number(skillFamilyTargetEl.value),
     });
     profileDraft = { ...updated };
     renderSettings();
@@ -600,6 +638,8 @@ settingsSaveBtn.addEventListener('click', async () => {
     settingsSaveBtn.disabled = false;
   }
 });
+
+notifyThresholdEl.addEventListener('input', renderDistribution);
 
 notifyTestBtn.addEventListener('click', async () => {
   notifyTestBtn.disabled = true;
