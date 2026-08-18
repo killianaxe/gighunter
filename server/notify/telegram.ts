@@ -45,13 +45,30 @@ function formatSalary(min: number | null, max: number | null): string | null {
  * parsers treat as markup (*, _, [, ]), and one unescaped bracket fails the whole send.
  * Bare URLs still auto-link in plain text, which is all the formatting that matters here.
  */
+/** Telegram rejects any message over 4096 characters; stay clear of the edge. */
+const MAX_MESSAGE_CHARS = 3800;
+const MAX_ENTRIES = 12;
+
 export function formatDigest(matches: NotifiableMatch[]): string {
   const header = `🛰 Orbit found ${matches.length} strong match${matches.length === 1 ? '' : 'es'}`;
-  const blocks = matches.map(m => {
+  const render = (m: NotifiableMatch) => {
     const meta = [formatSalary(m.salaryMin, m.salaryMax), m.location].filter(Boolean).join(' · ');
     return [`${m.score}% · ${m.title} — ${m.company}`, meta, m.url].filter(Boolean).join('\n');
-  });
-  return [header, ...blocks].join('\n\n');
+  };
+
+  // Highest-scoring first (the query orders by score), so a truncated digest keeps the best.
+  const blocks: string[] = [];
+  let used = header.length;
+  for (const match of matches.slice(0, MAX_ENTRIES)) {
+    const block = render(match);
+    if (used + block.length + 2 > MAX_MESSAGE_CHARS) break;
+    blocks.push(block);
+    used += block.length + 2;
+  }
+
+  const omitted = matches.length - blocks.length;
+  const footer = omitted > 0 ? `…and ${omitted} more — see the dashboard.` : null;
+  return [header, ...blocks, footer].filter(Boolean).join('\n\n');
 }
 
 async function sendMessage(text: string): Promise<void> {

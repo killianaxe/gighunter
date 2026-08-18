@@ -8,6 +8,16 @@ export interface MatchResult {
   excluded: boolean;
 }
 
+/**
+ * How many profile skills a posting must mention to earn the full 60-point skill score.
+ *
+ * Scoring against the *entire* skills list punishes a broad profile: these 12 skills span
+ * virtualization, identity, and security, and no single real posting mentions six of them —
+ * so a job titled "VMware Engineer" scored 2/12 and landed at 50%. Capping the denominator
+ * rewards depth in any one area instead, and stops each added skill from deflating every score.
+ */
+const SKILL_TARGET = 5;
+
 /** Pure scoring: skill overlap (60), salary overlap (25), location fit (15); exclusion keywords veto to 0. */
 export function scoreJob(job: JobRow, candidate: Candidate): MatchResult {
   for (const exclusion of candidate.exclusions) {
@@ -22,10 +32,11 @@ export function scoreJob(job: JobRow, candidate: Candidate): MatchResult {
 
   if (candidate.skills.length > 0) {
     const matchedSkills = candidate.skills.filter(skill => skillsHaystack.includes(skill.toLowerCase()));
-    score += Math.round((matchedSkills.length / candidate.skills.length) * 60);
+    const target = Math.min(SKILL_TARGET, candidate.skills.length);
+    score += Math.round(Math.min(matchedSkills.length / target, 1) * 60);
     reasons.push(
       matchedSkills.length > 0
-        ? `${matchedSkills.length}/${candidate.skills.length} skills match (${matchedSkills.slice(0, 4).join(', ')})`
+        ? `${matchedSkills.length} of ${target} skills needed for full credit (${matchedSkills.slice(0, 4).join(', ')})`
         : 'No listed skills found in the posting'
     );
   }
