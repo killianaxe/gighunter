@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+auto/node_modules/
+
+# build output
+dist/
+auto/dist/
+
+# secrets — real API keys live only on this machine
+server/.env
+auto/.env
+
+# personal data — your real profile, resumes, DB, and generated resumes never leave this machine
+server/profile.json
+server/data/
+auto/downloads/
+auto/logs/
+
+# editor/OS
+.DS_Store
+*:Zone.Identifier

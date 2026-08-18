@@ -1,0 +1,21 @@
+{
+  "name": "autogighunter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "mcp": "tsx src/mcp-server.ts",
+    "start:mcp": "node dist/mcp-server.js",
+    "start:scheduler": "node dist/scheduler.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

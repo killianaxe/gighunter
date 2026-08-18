@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orbit — Job Search Agent</title>
+    <link rel="icon" type="image/png" href="logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="#"><img class="brand-mark" src="logo.png" alt="Red Shift Cybersecurity" /> Orbit</a>
+      <nav>
+        <a class="nav-link active" href="#overview"><span>⌘</span> Overview</a>
+        <a class="nav-link" href="#matches"><span>◈</span> Matches <b id="nav-matches-count">0</b></a>
+        <a class="nav-link" href="#pipeline"><span>↗</span> Pipeline</a>
+        <a class="nav-link" href="#sources"><span>⌁</span> Sources</a>
+        <a class="nav-link" href="#documents"><span>▤</span> Documents</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <a class="nav-link" href="#settings"><span>⚙</span> Agent settings</a>
+        <div class="profile"><div class="avatar" id="profile-avatar">··</div><div><strong id="profile-name">Loading…</strong><small>Job seeker</small></div><button aria-label="Profile menu">···</button></div>
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <div><p class="eyebrow" id="today-label">TODAY</p><h1>Your search is moving.</h1></div>
+        <div class="header-actions"><button class="icon-btn" aria-label="Notifications">♧<i></i></button><button class="primary" id="run-agent">Run agent <span>→</span></button></div>
+      </header>
+
+      <section class="agent-card" id="overview">
+        <div class="agent-top"><div class="agent-name"><span class="pulse" id="agent-pulse"></span><div><p class="eyebrow">YOUR SEARCH AGENT</p><h2 id="agent-status">Scout is idle</h2></div></div><button class="quiet-btn" id="pause-agent">Pause</button></div>
+        <div class="agent-grid">
+          <div><span class="metric" id="metric-new-roles">0</span><p>new roles found</p></div>
+          <div><span class="metric" id="metric-strong-matches">0</span><p>strong matches</p></div>
+          <div><span class="metric" id="metric-applications-prepared">0</span><p>applications prepared</p></div>
+          <div class="next-scan"><p class="eyebrow">NEXT SCAN</p><strong id="next-scan-time">—</strong><small id="active-sources-count">0 active sources</small></div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="main-column">
+          <div class="section-title"><div><p class="eyebrow">PRIORITY QUEUE</p><h2>Best opportunities</h2></div><a href="#matches">View all <span id="matches-total">0</span> <span>→</span></a></div>
+          <div class="job-list" id="matches">
+            <p class="empty-state">Click "Run agent" to scan your sources for matches.</p>
+          </div>
+        </div>
+        <aside class="right-column">
+          <section class="progress-card"><div class="section-title"><div><p class="eyebrow">WEEKLY PROGRESS</p><h2>On track</h2></div><span class="up">↑ 18%</span></div><div class="chart"><div class="chart-y"><span>20</span><span>10</span><span>0</span></div><div class="bars"><div style="--h:35%"><i></i><small>M</small></div><div style="--h:52%"><i></i><small>T</small></div><div style="--h:25%"><i></i><small>W</small></div><div style="--h:72%"><i></i><small>T</small></div><div style="--h:90%" class="today"><i></i><small>F</small></div><div style="--h:20%"><i></i><small>S</small></div><div style="--h:20%"><i></i><small>S</small></div></div></div><div class="goal"><span id="applications-goal-label">0 applications prepared</span><div><i></i></div></div></section>
+          <section class="source-card" id="sources"><div class="section-title"><div><p class="eyebrow">ACTIVE SOURCES</p><h2 id="sources-heading">Watching 0 sites</h2></div><button class="add-source" id="add-source">+</button></div><ul id="source-list"><li class="empty-state">No sources yet — add one with the + button.</li></ul></section>
+        </aside>
+      </section>
+      <section class="pipeline-card" id="pipeline">
+        <div class="section-title"><div><p class="eyebrow">PIPELINE</p><h2>Jobs by stage</h2></div></div>
+        <div class="pipeline-board">
+          <div class="pipeline-col"><div class="pipeline-col-head"><span>New</span><b id="pipeline-count-new">0</b></div><ul id="pipeline-list-new"></ul></div>
+          <div class="pipeline-col"><div class="pipeline-col-head"><span>Matched</span><b id="pipeline-count-matched">0</b></div><ul id="pipeline-list-matched"></ul></div>
+          <div class="pipeline-col"><div class="pipeline-col-head"><span>Drafted</span><b id="pipeline-count-drafted">0</b></div><ul id="pipeline-list-drafted"></ul></div>
+          <div class="pipeline-col"><div class="pipeline-col-head"><span>Approved</span><b id="pipeline-count-approved">0</b></div><ul id="pipeline-list-approved"></ul></div>
+        </div>
+      </section>
+      <section class="documents-card" id="documents">
+        <div class="section-title"><div><p class="eyebrow">YOUR DOCUMENTS</p><h2>Resumes &amp; CVs on file</h2></div></div>
+        <p class="documents-hint">Drop resume/CV files straight into <code id="documents-folder-path">server/data/documents</code> — they'll show up here automatically. These are your source files; Orbit never edits them. The tailored resume for a specific job lives in that job's Review dialog instead.</p>
+        <ul id="document-list" class="document-list"><li class="empty-state">No documents yet.</li></ul>
+      </section>
+      <section class="settings-card" id="settings">
+        <div class="section-title"><div><p class="eyebrow">AGENT SETTINGS</p><h2>Search targeting</h2></div><span class="settings-status" id="settings-status"></span></div>
+        <p class="settings-hint">This drives how Scout scores every posting — skills match is 60% of a job's score, salary fit 25%, location fit 15%, and any exclusion match zeroes a job out entirely. Saving re-scores every job you've already found.</p>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>Salary range</label>
+            <div class="salary-inputs"><input type="number" id="settings-salary-min" placeholder="Min" min="0" step="1000" /><span>–</span><input type="number" id="settings-salary-max" placeholder="Max" min="0" step="1000" /></div>
+          </div>
+          <div class="settings-field">
+            <label>Target locations</label>
+            <div class="tag-editor" id="locations-editor"></div>
+            <div class="tag-input-row"><input type="text" id="locations-input" placeholder="Add a location, e.g. Remote" /><button type="button" id="locations-add">Add</button></div>
+            <div class="preset-chips" id="location-presets"></div>
+          </div>
+          <div class="settings-field">
+            <label>Exclusions</label>
+            <div class="tag-editor" id="exclusions-editor"></div>
+            <div class="tag-input-row"><input type="text" id="exclusions-input" placeholder="Add an exclusion keyword" /><button type="button" id="exclusions-add">Add</button></div>
+          </div>
+          <div class="settings-field">
+            <label>Skills</label>
+            <div class="tag-editor" id="skills-editor"></div>
+            <div class="tag-input-row"><input type="text" id="skills-input" placeholder="Add a skill" /><button type="button" id="skills-add">Add</button></div>
+          </div>
+        </div>
+        <button class="primary" id="settings-save">Save &amp; re-score <span>→</span></button>
+      </section>
+      <section class="safety"><span>✓</span><div><strong>Application safeguard is on</strong><p>Scout drafts tailored applications and queues them for your approval before anything is submitted.</p></div><a href="#settings">Configure →</a></section>
+    </main>
+    <dialog id="review-dialog">
+      <button class="close" id="close-dialog">×</button>
+      <p class="eyebrow">APPLICATION REVIEW</p>
+      <h2 id="dialog-title">Ready to review</h2>
+      <p class="dialog-copy" id="dialog-summary">Scout has tailored your resume and drafted answers using your profile. Confirm the details and submit this application yourself.</p>
+      <ul class="dialog-bullets" id="dialog-bullets"></ul>
+      <div class="review-row"><span>Match rationale</span><strong id="dialog-rationale">—</strong></div>
+      <div class="review-row"><span>Tailored resume</span><a id="dialog-download" href="#" target="_blank" rel="noopener">Download .docx</a></div>
+      <button class="primary dialog-action" id="dialog-primary">Open application <span>↗</span></button>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

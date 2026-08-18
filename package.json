@@ -1,0 +1,32 @@
+{
+  "name": "orbit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["auto"],
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "start": "tsx server/index.ts",
+    "build": "tsc",
+    "seed": "tsx server/seed.ts",
+    "setup": "npm install && npm run build --workspaces",
+    "mcp": "npm run mcp -w autogighunter"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/static": "^10.1.3",
+    "better-sqlite3": "^11.8.1",
+    "docx": "^9.7.1",
+    "fastify": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
+
+
+

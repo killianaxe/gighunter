@@ -1,0 +1,52 @@
+{
+  "name": "Your Name",
+  "email": "you@example.com",
+  "phone": "555-123-4567",
+  "linkedin": "https://www.linkedin.com/in/your-handle/",
+  "homeLocation": "Your City, ST",
+  "skills": ["Product Design", "Figma", "Design Systems", "User Research"],
+  "salaryMin": 120000,
+  "salaryMax": 180000,
+  "locations": ["Remote"],
+  "exclusions": ["unpaid", "commission only", "internship"],
+  "resumeBullets": [
+    {
+      "text": "Describe a real, specific accomplishment here — this is what gets pulled into tailored drafts.",
+      "keywords": ["design systems", "figma"]
+    },
+    {
+      "text": "Add another factual bullet. Keywords determine which JDs pull this bullet into a draft.",
+      "keywords": ["user research", "product"]
+    },
+    {
+      "text": "A third bullet covering a different skill area helps the matcher and drafter pick the most relevant ones per job.",
+      "keywords": ["engineering", "component library"]
+    }
+  ],
+  "certifications": ["Example Certification Name"],
+  "education": [
+    {
+      "degree": "Your Degree",
+      "school": "Your School, City, ST",
+      "years": "20XX–20XX"
+    }
+  ],
+  "workHistory": [
+    {
+      "title": "Your Most Recent Title",
+      "company": "Employer Name",
+      "location": "City, ST or Remote",
+      "startDate": "2023-01",
+      "endDate": null,
+      "bullets": [
+        {
+          "text": "A factual accomplishment from this specific role — this is what powers the full resume export, distinct from the flat resumeBullets pool above.",
+          "keywords": ["relevant", "keywords", "here"]
+        }
+      ]
+    }
+  ],
+  "additionalExperience": [
+    "Earlier Title, Earlier Employer (20XX–20XX) — one-line condensed summary of the role"
+  ]
+}
