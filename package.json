@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["auto"],
+  "workspaces": [
+    "auto"
+  ],
   "scripts": {
     "dev": "tsx watch server/index.ts",
     "start": "tsx server/index.ts",
@@ -13,12 +15,15 @@
     "mcp": "npm run mcp -w autogighunter"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^10.0.2",
     "@fastify/static": "^10.1.3",
     "better-sqlite3": "^11.8.1",
     "docx": "^9.7.1",
-    "fastify": "^5.2.1"
+    "fastify": "^5.2.1",
+    "mammoth": "^1.12.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
@@ -27,6 +32,3 @@
     "typescript": "^5.7.3"
   }
 }
-
-
-
