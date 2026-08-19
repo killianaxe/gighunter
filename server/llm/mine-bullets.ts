@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { getClient, MODEL, estimateCostUsd } from './client.js';
+import { getClient, MINING_MODEL, estimateCostUsd } from './client.js';
 import type { ExtractedDocument } from '../documents/extract-text.js';
+import { dedupeDocuments, renderDedupedCorpus, type DedupedBlock, type DedupeResult } from '../documents/dedupe.js';
 
 /** Families mirror SKILL_FAMILIES in pipeline/match.ts so mined bullets slot into domain scoring. */
 export const BULLET_FAMILIES = [
@@ -56,33 +57,72 @@ Be thorough — capture every distinct accomplishment across all documents, incl
 
 export interface MiningOutcome extends MiningResult {
   usage: { inputTokens: number; outputTokens: number; costUsd: number };
+  dedupe: DedupeResult['stats'];
 }
 
 /**
- * One call with every document in context, so the model can deduplicate globally — the same
- * achievement reworded across a dozen resume drafts can only be collapsed with a full view.
+ * Thinking tokens are billed as output AND count against max_tokens, so effort is the setting
+ * that actually governs whether a batch fits. At xhigh the model reasoned its way through most
+ * of a 16k budget before emitting JSON and truncated. Extraction here is rule-following against
+ * an explicit schema, not open judgment, so low effort is both correct and what fits.
  */
-export async function mineBullets(documents: ExtractedDocument[]): Promise<MiningOutcome> {
-  const corpus = documents
-    .map(doc => `<document name="${doc.name}">\n${doc.text}\n</document>`)
-    .join('\n\n');
+const BLOCKS_PER_BATCH = Number(process.env.MINING_BLOCKS_PER_BATCH) || 60;
+const MAX_TOKENS_PER_BATCH = Number(process.env.MINING_MAX_TOKENS) || 32000;
 
-  const response = await getClient().messages.parse({
-    model: MODEL,
-    max_tokens: 32000,
+export interface BatchOutcome {
+  bullets: MinedBullet[];
+  employersSeen: string[];
+  notes: string[];
+  usage: { inputTokens: number; outputTokens: number; costUsd: number };
+}
+
+/**
+ * Mines one batch of deduplicated blocks.
+ *
+ * Streamed rather than a plain request: the SDK caps non-streaming calls at 10 minutes, and
+ * Opus at xhigh effort runs past that on batches this size.
+ */
+export async function mineBatch(
+  blocks: DedupedBlock[],
+  context: { batch: number; batches: number },
+  onProgress?: (chars: number) => void
+): Promise<BatchOutcome> {
+  const corpus = renderDedupedCorpus(blocks);
+
+  const stream = getClient().messages.stream({
+    model: MINING_MODEL,
+    max_tokens: MAX_TOKENS_PER_BATCH,
     system: SYSTEM,
     thinking: { type: 'adaptive' },
+    output_config: { effort: 'low', format: zodOutputFormat(MiningResult) },
     messages: [
       {
         role: 'user',
-        content: `Here are ${documents.length} versions of my resume/CV, written over ~25 years. Extract the complete deduplicated library of my accomplishment bullets.\n\n${corpus}`,
+        content:
+          `This is part ${context.batch} of ${context.batches} of my resume material, spanning ~25 years and ` +
+          `20+ drafts. Exact and near-exact repeats have already been collapsed mechanically; each block is ` +
+          `annotated with how many drafts contained it and the newest such draft. A block in many drafts is ` +
+          `long-standing material; one in few may be recent or abandoned.\n\n` +
+          `Extract every distinct accomplishment bullet from this part. Ignore section headers, contact ` +
+          `details, and skills lists — only accomplishments.\n\n${corpus}`,
       },
     ],
-    output_config: { format: zodOutputFormat(MiningResult) },
   });
 
+  if (onProgress) stream.on('text', text => onProgress(text.length));
+  const response = await stream.finalMessage();
+
   if (!response.parsed_output) {
-    throw new Error(`Model returned no parseable output (stop_reason: ${response.stop_reason})`);
+    // The response was billed whether or not it parsed. Surface what was actually spent and
+    // how the budget was divided, so the next attempt is sized from data rather than a guess.
+    const text = response.content.find(block => block.type === 'text');
+    throw Object.assign(
+      new Error(
+        `batch ${context.batch}: no parseable output (stop_reason: ${response.stop_reason}) — ` +
+          `used ${response.usage.output_tokens} of ${MAX_TOKENS_PER_BATCH} output tokens`
+      ),
+      { partialText: text && 'text' in text ? text.text : '', usage: response.usage }
+    );
   }
 
   return {
@@ -90,7 +130,44 @@ export async function mineBullets(documents: ExtractedDocument[]): Promise<Minin
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
-      costUsd: estimateCostUsd(response.usage),
+      costUsd: estimateCostUsd(response.usage, MINING_MODEL),
+    },
+  };
+}
+
+/** Splits deduplicated blocks into batches sized for a single response. */
+export function planBatches(documents: ExtractedDocument[]): { batches: DedupedBlock[][]; stats: DedupeResult['stats'] } {
+  const deduped = dedupeDocuments(documents);
+  const batches: DedupedBlock[][] = [];
+  for (let i = 0; i < deduped.blocks.length; i += BLOCKS_PER_BATCH) {
+    batches.push(deduped.blocks.slice(i, i + BLOCKS_PER_BATCH));
+  }
+  return { batches, stats: deduped.stats };
+}
+
+/**
+ * Merges batch results into one library, dropping any bullet a later batch repeats verbatim.
+ * The mechanical dedup already collapsed near-duplicates, so this only guards the seams.
+ */
+export function mergeBatches(results: BatchOutcome[]): MiningResult & { usage: BatchOutcome['usage'] } {
+  const seen = new Set<string>();
+  const bullets: MinedBullet[] = [];
+  for (const result of results) {
+    for (const bullet of result.bullets) {
+      const key = bullet.text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      bullets.push(bullet);
+    }
+  }
+  return {
+    bullets,
+    employersSeen: [...new Set(results.flatMap(r => r.employersSeen))],
+    notes: results.flatMap(r => r.notes),
+    usage: {
+      inputTokens: results.reduce((sum, r) => sum + r.usage.inputTokens, 0),
+      outputTokens: results.reduce((sum, r) => sum + r.usage.outputTokens, 0),
+      costUsd: results.reduce((sum, r) => sum + r.usage.costUsd, 0),
     },
   };
 }
