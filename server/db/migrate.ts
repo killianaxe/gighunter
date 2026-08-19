@@ -40,6 +40,7 @@ export function migrateSourcesTable(db: Database.Database): void {
 }
 
 const CANDIDATE_COLUMNS: Record<string, string> = {
+  headline: 'TEXT',
   email: 'TEXT',
   phone: 'TEXT',
   linkedin: 'TEXT',
@@ -75,4 +76,18 @@ export function migrateJobsColumns(db: Database.Database): void {
 
   db.exec(`ALTER TABLE jobs ADD COLUMN notified_at TEXT`);
   db.exec(`UPDATE jobs SET notified_at = datetime('now')`);
+}
+
+/**
+ * Adds applications.tailoring_json for the full tailoring result — keyword gaps, the
+ * covered-but-unstated list, and the fit assessment have no home in the three draft_* columns,
+ * and they are the fields worth reading before deciding whether to apply.
+ */
+export function migrateApplicationsColumns(db: Database.Database): void {
+  const existing = new Set(
+    (db.prepare(`PRAGMA table_info(applications)`).all() as { name: string }[]).map(c => c.name)
+  );
+  if (!existing.has('tailoring_json')) {
+    db.exec('ALTER TABLE applications ADD COLUMN tailoring_json TEXT');
+  }
 }

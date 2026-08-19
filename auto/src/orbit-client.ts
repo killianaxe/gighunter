@@ -45,12 +45,33 @@ export interface SourceEntry {
   created_at: string;
 }
 
+export interface TailoringContext {
+  job: { id: string; title: string; company: string; location: string | null; description: string | null };
+  /** The candidate's full material, formatted exactly as Orbit's own tailoring prompt formats it. */
+  candidateBrief: string;
+  /** Orbit's honesty constraints — never invent experience, preserve every metric verbatim. */
+  rules: string;
+  expectedShape: Record<string, string>;
+}
+
+export interface TailoredApplication {
+  headline: string;
+  summary: string;
+  bullets: { sourceText: string; tailoredText: string; changed: boolean }[];
+  leadSkills: string[];
+  leadCertifications: string[];
+  keywordGaps: string[];
+  coveredButUnstated: string[];
+  fitAssessment: string;
+}
+
 export interface ApplicationDetail {
   id: string;
   status: 'drafted' | 'approved';
   headline: string | null;
   summary: string | null;
   bullets: string[];
+  tailoring: TailoredApplication | null;
   job: { id: string; title: string; company: string; url: string; location: string | null };
   createdAt: string;
   decidedAt: string | null;
@@ -104,7 +125,22 @@ export const orbit = {
 
   draftApplication: (jobId: string) => postJson<ApplicationDetail>(`/api/applications/${jobId}/draft`),
 
+  /** Job posting, candidate material, and Orbit's tailoring rules — everything needed in one call. */
+  getTailoringContext: (jobId: string) =>
+    request<TailoringContext>(`/api/applications/${jobId}/tailoring-context`),
+
+  /** Stores a tailoring. Orbit validates the shape and rejects a near-miss with 400 + issues. */
+  saveTailoring: (jobId: string, tailoring: TailoredApplication) =>
+    postJson<ApplicationDetail>(`/api/applications/${jobId}/tailoring`, tailoring),
+
   getApplication: (id: string) => request<ApplicationDetail>(`/api/applications/${id}`),
+
+  /**
+   * Pushes the tailored .docx into the Telegram chat. The local download path is only reachable
+   * from the machine Orbit runs on, so this is what makes the resume available on a phone.
+   */
+  sendResumeToTelegram: (id: string) =>
+    postJson<{ filename: string; bytes: number }>(`/api/applications/${id}/telegram`),
 
   approveApplication: (id: string) => postJson<ApplicationDetail>(`/api/applications/${id}/approve`),
 

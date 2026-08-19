@@ -39,6 +39,16 @@ async function runCycle(): Promise<void> {
       const application = await orbit.draftApplication(match.jobId);
       const resumePath = await orbit.downloadResume(application.id);
       log(`Auto-drafted "${match.title}" @ ${match.company} (${match.score}%) → ${resumePath}`);
+
+      // Delivery is best-effort and deliberately separate from drafting: a Telegram outage,
+      // a disabled notifier, or missing credentials must not lose the draft that already
+      // succeeded. The resume is on disk either way; this only adds the mobile copy.
+      try {
+        const sent = await orbit.sendResumeToTelegram(application.id);
+        log(`  → sent ${sent.filename} to Telegram (${sent.bytes} bytes)`);
+      } catch (err) {
+        log(`  → Telegram delivery skipped: ${err instanceof Error ? err.message : err}`);
+      }
     } catch (err) {
       log(`Failed to auto-draft "${match.title}" @ ${match.company}: ${err instanceof Error ? err.message : err}`);
     }

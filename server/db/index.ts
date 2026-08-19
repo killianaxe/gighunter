@@ -2,7 +2,12 @@ import Database from 'better-sqlite3';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { migrateSourcesTable, migrateCandidatesColumns, migrateJobsColumns } from './migrate.js';
+import {
+  migrateSourcesTable,
+  migrateCandidatesColumns,
+  migrateJobsColumns,
+  migrateApplicationsColumns,
+} from './migrate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverDir = resolve(__dirname, '..');
@@ -23,3 +28,4 @@ db.exec(schema);
 migrateSourcesTable(db);
 migrateCandidatesColumns(db);
 migrateJobsColumns(db);
+migrateApplicationsColumns(db);

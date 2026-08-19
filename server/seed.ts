@@ -16,6 +16,7 @@ if (!existsSync(profilePath)) {
 
 interface ProfileFile {
   name: string;
+  headline?: string;
   skills: string[];
   salaryMin: number | null;
   salaryMax: number | null;
@@ -45,6 +46,7 @@ const defaultUserId = process.env.DEFAULT_USER_ID ?? 'default-user';
 const existingCandidate = db.prepare(`SELECT id FROM candidates WHERE id = ?`).get(defaultUserId);
 
 const resumeDetailArgs = [
+  profile.headline ?? null,
   profile.email ?? null,
   profile.phone ?? null,
   profile.linkedin ?? null,
@@ -61,7 +63,7 @@ if (existingCandidate) {
     UPDATE candidates SET
       name = ?, skills_json = ?, salary_min = ?, salary_max = ?,
       locations_json = ?, exclusions_json = ?, resume_bullets_json = ?,
-      email = ?, phone = ?, linkedin = ?, home_location = ?,
+      headline = ?, email = ?, phone = ?, linkedin = ?, home_location = ?,
       certifications_json = ?, education_json = ?, work_history_json = ?, additional_experience_json = ?
     WHERE id = ?
   `
@@ -82,9 +84,9 @@ if (existingCandidate) {
     `
     INSERT INTO candidates (
       id, name, skills_json, salary_min, salary_max, locations_json, exclusions_json, resume_bullets_json,
-      email, phone, linkedin, home_location, certifications_json, education_json, work_history_json, additional_experience_json
+      headline, email, phone, linkedin, home_location, certifications_json, education_json, work_history_json, additional_experience_json
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
   ).run(
     defaultUserId,

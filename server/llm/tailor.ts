@@ -9,7 +9,7 @@ const TailoredBullet = z.object({
   changed: z.boolean().describe('False when the original already fits and was returned unmodified.'),
 });
 
-const TailoredApplication = z.object({
+export const TailoredApplicationSchema = z.object({
   headline: z.string().describe('One line positioning the candidate for this specific role. No template phrasing.'),
   summary: z.string().describe('Two or three sentences of professional summary aimed at this posting.'),
   bullets: z.array(TailoredBullet).describe('The 4-6 most relevant bullets, strongest first, rewritten for this posting.'),
@@ -24,9 +24,9 @@ const TailoredApplication = z.object({
   fitAssessment: z.string().describe('One honest sentence on fit, including reasons not to apply if they exist.'),
 });
 
-export type TailoredApplication = z.infer<typeof TailoredApplication>;
+export type TailoredApplication = z.infer<typeof TailoredApplicationSchema>;
 
-const SYSTEM = `You tailor a real candidate's resume material to a specific job posting. Your output is sent to real employers on their behalf, so honesty is a hard constraint, not a preference.
+export const TAILORING_RULES = `You tailor a real candidate's resume material to a specific job posting. Your output is sent to real employers on their behalf, so honesty is a hard constraint, not a preference.
 
 ABSOLUTE RULES:
 - NEVER invent experience, skills, employers, dates, tools, or metrics. You may only rephrase what the candidate has actually written.
@@ -46,7 +46,11 @@ export interface TailoringOutcome extends TailoredApplication {
   usage: { inputTokens: number; outputTokens: number; costUsd: number };
 }
 
-function candidateBrief(candidate: Candidate): string {
+/**
+ * The candidate's full material as the model sees it. Exported because the MCP tailoring route
+ * hands the identical brief to an agent — the two paths must not drift.
+ */
+export function candidateBrief(candidate: Candidate): string {
   const bullets = candidate.resumeBullets.map(b => `- ${b.text}`).join('\n');
   const history = candidate.workHistory
     .map(
@@ -71,7 +75,7 @@ export async function tailorApplication(job: JobRow, candidate: Candidate): Prom
   const response = await getClient().messages.parse({
     model: MODEL,
     max_tokens: 16000,
-    system: SYSTEM,
+    system: TAILORING_RULES,
     thinking: { type: 'adaptive' },
     messages: [
       {
@@ -82,7 +86,7 @@ export async function tailorApplication(job: JobRow, candidate: Candidate): Prom
           `# My material\n${candidateBrief(candidate)}`,
       },
     ],
-    output_config: { format: zodOutputFormat(TailoredApplication) },
+    output_config: { format: zodOutputFormat(TailoredApplicationSchema) },
   });
 
   if (!response.parsed_output) {

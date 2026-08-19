@@ -93,6 +93,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  'orbit_send_resume_to_telegram',
+  {
+    description:
+      "Sends the tailored .docx resume for an application into the Telegram chat, where it can be saved on a phone and attached to the real application from there. Use this when the candidate is away from the machine Orbit runs on — the normal download link points at localhost and does not work on mobile. Requires the Telegram notifier to be configured and enabled.",
+    inputSchema: z.object({ applicationId: z.string().min(1) }),
+  },
+  async ({ applicationId }) => text(await withOrbit(() => orbit.sendResumeToTelegram(applicationId)))
+);
+
+server.registerTool(
   'orbit_approve_application',
   {
     description:
@@ -116,6 +126,53 @@ server.registerTool(
         return matches.filter(m => m.applicationStatus === 'drafted');
       })
     )
+);
+
+
+/**
+ * The tailoring pair. These are what let a Claude Code session do the tailoring itself instead of
+ * Orbit paying for an API call: the agent reads the context, reasons, and writes the result back.
+ * Orbit stays mechanical — it serves material and stores an answer, and never calls a model.
+ */
+server.registerTool(
+  'orbit_tailoring_context',
+  {
+    description:
+      "Everything needed to tailor a resume for one job: the posting, the candidate's full accomplishment library, and Orbit's honesty rules (never invent experience; preserve every metric, date, and proper noun exactly). Read this, write the tailoring yourself, then save it with orbit_save_tailoring.",
+    inputSchema: z.object({ jobId: z.string().min(1) }),
+  },
+  async ({ jobId }) => text(await withOrbit(() => orbit.getTailoringContext(jobId)))
+);
+
+server.registerTool(
+  'orbit_save_tailoring',
+  {
+    description:
+      'Saves a tailoring you wrote for a job, replacing the placeholder draft. Orbit validates the shape and returns 400 with specific issues if anything is missing — fix and resend. Every bullet\'s tailoredText must be a rewrite of real candidate material, never new experience.',
+    inputSchema: z.object({
+      jobId: z.string().min(1),
+      headline: z.string().min(1).describe('One line positioning the candidate for this specific role. No template phrasing.'),
+      summary: z.string().min(1).describe('Two or three sentences of professional summary aimed at this posting.'),
+      bullets: z
+        .array(
+          z.object({
+            sourceText: z.string().describe('The original bullet, copied exactly, so the rewrite can be diffed.'),
+            tailoredText: z.string().describe('The rewrite, leading with the vocabulary this posting uses.'),
+            changed: z.boolean().describe('False when the original already fit and was returned unmodified.'),
+          })
+        )
+        .min(1)
+        .describe('The 4-6 most relevant bullets, strongest first.'),
+      leadSkills: z.array(z.string()).describe('Candidate skills ordered by relevance to this posting.'),
+      leadCertifications: z.array(z.string()).describe('Candidate certifications ordered by relevance.'),
+      keywordGaps: z.array(z.string()).describe('Terms this posting emphasises that the candidate genuinely lacks. An honest gap list — do not fill it in.'),
+      coveredButUnstated: z
+        .array(z.string())
+        .describe('Terms the posting wants that the candidate demonstrably has but never names literally (e.g. holds VCP-Network Virtualization but never writes "NSX"). These are silent ATS failures.'),
+      fitAssessment: z.string().describe('One honest sentence on fit, including reasons not to apply if they exist.'),
+    }),
+  },
+  async ({ jobId, ...tailoring }) => text(await withOrbit(() => orbit.saveTailoring(jobId, tailoring)))
 );
 
 async function main() {

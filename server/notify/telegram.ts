@@ -92,6 +92,84 @@ export async function sendTestMessage(): Promise<void> {
   await sendMessage('🛰 Orbit test message — your Telegram notifier is connected.');
 }
 
+export function telegramConfigured(): boolean {
+  return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
+}
+
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+/** Telegram truncates captions past 1024 characters. */
+const MAX_CAPTION_CHARS = 1000;
+
+/**
+ * Uploads a file into the Telegram chat.
+ *
+ * This is the only way the tailored resume reaches a phone. Orbit serves resumes from
+ * http://127.0.0.1:3000, which is reachable from the machine Orbit runs on and nowhere else —
+ * a link in the digest is useless on mobile. Pushing the bytes through the bot puts the .docx
+ * in the chat itself, where Android's "save to Downloads" makes it available to the file picker
+ * of any job application in the browser.
+ *
+ * Bots may upload documents up to 50 MB; a tailored resume is around 12 KB.
+ */
+async function sendDocument(file: Buffer, filename: string, caption: string): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  const form = new FormData();
+  form.set('chat_id', String(chatId));
+  form.set('caption', caption.slice(0, MAX_CAPTION_CHARS));
+  form.set('disable_notification', 'false');
+  form.set('document', new Blob([new Uint8Array(file)], { type: DOCX_MIME }), filename);
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+    method: 'POST',
+    body: form,
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { description?: string } | null;
+    throw new Error(body?.description ?? `Telegram responded ${res.status}`);
+  }
+}
+
+export interface ResumeDelivery {
+  filename: string;
+  bytes: number;
+  skipped: 'disabled' | 'unconfigured' | null;
+}
+
+/**
+ * Delivers one tailored resume to Telegram, captioned with what it is and where to apply.
+ *
+ * Caption is plain text for the same reason the digest is (see formatDigest): job titles
+ * routinely contain characters Telegram's Markdown parser treats as markup, and one stray
+ * bracket fails the whole send.
+ */
+export async function sendResumeDocument(
+  file: Buffer,
+  filename: string,
+  job: { title: string; company: string; url: string; score?: number | null }
+): Promise<ResumeDelivery> {
+  const { notifyEnabled } = getNotificationSettings();
+  if (!notifyEnabled) return { filename, bytes: file.length, skipped: 'disabled' };
+  if (!telegramConfigured()) return { filename, bytes: file.length, skipped: 'unconfigured' };
+
+  const caption = [
+    `📄 Tailored resume — ${job.title}`,
+    job.company,
+    job.score != null ? `${job.score}% match` : null,
+    '',
+    'Save this file, then attach it from Downloads when you apply:',
+    job.url,
+  ]
+    .filter(v => v !== null)
+    .join('\n');
+
+  await sendDocument(file, filename, caption);
+  logAudit('notify', filename, 'telegram_resume_sent', `${job.title} — ${job.company}`);
+  return { filename, bytes: file.length, skipped: null };
+}
+
 /**
  * Announces any un-notified matches at or above the configured threshold, as ONE batched
  * message. Jobs are only flagged as notified after a successful send, so a Telegram outage

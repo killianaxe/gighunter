@@ -1,6 +1,7 @@
 export interface CandidateRow {
   id: string;
   name: string;
+  headline: string | null;
   skills_json: string;
   salary_min: number | null;
   salary_max: number | null;
@@ -21,6 +22,8 @@ export interface CandidateRow {
 export interface Candidate {
   id: string;
   name: string;
+  /** Stable professional tagline under the name — identity, not per-job positioning. */
+  headline: string | null;
   skills: string[];
   salaryMin: number | null;
   salaryMax: number | null;
@@ -66,6 +69,7 @@ export function candidateFromRow(row: CandidateRow): Candidate {
   return {
     id: row.id,
     name: row.name,
+    headline: row.headline,
     skills: JSON.parse(row.skills_json),
     salaryMin: row.salary_min,
     salaryMax: row.salary_max,
@@ -130,6 +134,7 @@ export interface ApplicationRow {
   draft_headline: string | null;
   draft_summary: string | null;
   draft_bullets_json: string;
+  tailoring_json: string | null;
   created_at: string;
   decided_at: string | null;
 }

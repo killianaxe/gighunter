@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS candidates (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  headline TEXT,
   skills_json TEXT NOT NULL DEFAULT '[]',
   salary_min INTEGER,
   salary_max INTEGER,
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS applications (
   draft_headline TEXT,
   draft_summary TEXT,
   draft_bullets_json TEXT NOT NULL DEFAULT '[]',
+  tailoring_json TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   decided_at TEXT,
   UNIQUE(job_id, candidate_id)
