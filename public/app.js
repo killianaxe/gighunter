@@ -11,6 +11,11 @@ const metricApplicationsPrepared = document.querySelector('#metric-applications-
 const nextScanTimeEl = document.querySelector('#next-scan-time');
 const activeSourcesCountEl = document.querySelector('#active-sources-count');
 const applicationsGoalLabel = document.querySelector('#applications-goal-label');
+const activityHeading = document.querySelector('#activity-heading');
+const activityChange = document.querySelector('#activity-change');
+const activityAxis = document.querySelector('#activity-axis');
+const activityBars = document.querySelector('#activity-bars');
+const activityGoalFill = document.querySelector('#activity-goal-fill');
 
 const matchesEl = document.querySelector('#matches');
 const matchesTotal = document.querySelector('#matches-total');
@@ -157,10 +162,21 @@ function buildTags(match) {
 }
 
 // --- rendering ------------------------------------------------------------
+/** Signal band for a match score. 70 is Orbit's own strong-match cutoff. */
+function scoreBand(score) {
+  if (score >= 90) return '3';
+  if (score >= 70) return '2';
+  if (score >= 50) return '1';
+  return '0';
+}
+
 function createJobCard(match) {
   const card = document.createElement('article');
   card.className = 'job-card';
   card.dataset.jobId = match.jobId;
+  // Drives the signal strip on the card's bottom edge (see styles.css).
+  card.dataset.band = scoreBand(match.score);
+  card.style.setProperty('--score', match.score);
 
   const logo = document.createElement('div');
   logo.className = 'company-logo generic';
@@ -174,6 +190,7 @@ function createJobCard(match) {
   h3.textContent = match.title;
   const scoreSpan = document.createElement('span');
   scoreSpan.className = `score${match.score >= 90 ? ' high' : ''}`;
+  scoreSpan.dataset.band = scoreBand(match.score);
   scoreSpan.textContent = `${match.score}% match`;
   titleRow.append(h3, scoreSpan);
 
@@ -261,6 +278,55 @@ async function loadOverview() {
   profileAvatar.textContent = initials(data.candidateName);
 }
 
+/**
+ * Renders the weekly chart from real application activity.
+ *
+ * This panel used to be seven hardcoded bars and a literal "+18%". A progress chart that
+ * invents its own numbers is worse than no chart — it answers "is the search moving?" with
+ * fiction. Everything here comes from /api/activity, which counts rows in applications.
+ */
+async function loadActivity() {
+  const data = await getJSON('/api/activity');
+
+  // Scale to the busiest day so a quiet week still reads, with a floor of 1 to avoid /0.
+  const peak = Math.max(1, ...data.days.map(d => d.count));
+  const axisLabels = [peak, Math.round(peak / 2), 0];
+  activityAxis.innerHTML = '';
+  for (const value of axisLabels) {
+    const span = document.createElement('span');
+    span.textContent = value;
+    activityAxis.append(span);
+  }
+
+  activityBars.innerHTML = '';
+  data.days.forEach((day, index) => {
+    const wrap = document.createElement('div');
+    // A zero day still gets a sliver so the baseline reads as a day, not a gap.
+    wrap.style.setProperty('--h', `${day.count === 0 ? 2 : Math.round((day.count / peak) * 100)}%`);
+    if (index === data.days.length - 1) wrap.className = 'today';
+    wrap.title = `${day.date}: ${day.count} application${day.count === 1 ? '' : 's'} prepared`;
+    const bar = document.createElement('i');
+    const label = document.createElement('small');
+    label.textContent = day.label;
+    wrap.append(bar, label);
+    activityBars.append(wrap);
+  });
+
+  activityHeading.textContent =
+    data.thisWeek === 0 ? 'Nothing yet this week' : `${data.thisWeek} prepared this week`;
+
+  // Null means there was no prior week to compare against. Showing 0% would assert "flat",
+  // which is a different and false claim.
+  if (data.changePct === null) {
+    activityChange.hidden = true;
+  } else {
+    activityChange.hidden = false;
+    activityChange.textContent = `${data.changePct >= 0 ? '↑' : '↓'} ${Math.abs(data.changePct)}%`;
+  }
+
+  activityGoalFill.style.width = `${Math.round((data.thisWeek / Math.max(data.thisWeek, data.priorWeek, 1)) * 100)}%`;
+}
+
 async function loadMatches() {
   const { matches } = await getJSON('/api/matches');
   matchesById = new Map(matches.map(m => [m.jobId, m]));
@@ -323,6 +389,7 @@ function createPipelineRow(row, stage) {
   if (row.score !== null) {
     const score = document.createElement('span');
     score.className = `score${row.score >= 90 ? ' high' : ''}`;
+    score.dataset.band = scoreBand(row.score);
     score.textContent = `${row.score}%`;
     li.append(score);
   }
@@ -523,7 +590,7 @@ runAgentBtn.addEventListener('click', async () => {
   try {
     const summary = await postJSON('/api/scan');
     runAgentBtn.innerHTML = 'Scan complete <span>✓</span>';
-    await Promise.all([loadOverview(), loadMatches(), loadPipeline()]);
+    await Promise.all([loadOverview(), loadActivity(), loadMatches(), loadPipeline()]);
     if (summary.errors && summary.errors.length > 0) {
       console.warn('Some sources failed to scan:', summary.errors);
     }
@@ -630,7 +697,7 @@ settingsSaveBtn.addEventListener('click', async () => {
     profileDraft = { ...updated };
     renderSettings();
     settingsStatus.textContent = `Saved — re-scored ${updated.rescored} job${updated.rescored === 1 ? '' : 's'}`;
-    await Promise.all([loadOverview(), loadMatches()]);
+    await Promise.all([loadOverview(), loadActivity(), loadMatches()]);
   } catch (err) {
     settingsStatus.textContent = '';
     alert(`Could not save settings: ${err.message}`);
@@ -668,7 +735,7 @@ dialogPrimary.addEventListener('click', async () => {
     const approved = await postJSON(`/api/applications/${currentApplication.id}/approve`);
     window.open(approved.job.url, '_blank', 'noopener');
     dialog.close();
-    await Promise.all([loadOverview(), loadMatches(), loadPipeline()]);
+    await Promise.all([loadOverview(), loadActivity(), loadMatches(), loadPipeline()]);
   } catch (err) {
     alert(`Could not approve: ${err.message}`);
   } finally {
@@ -678,6 +745,6 @@ dialogPrimary.addEventListener('click', async () => {
 
 // --- init ------------------------------------------------------------
 setTodayLabel();
-Promise.all([loadOverview(), loadMatches(), loadSources(), loadDocuments(), loadProfile(), loadPipeline()]).catch(err => {
+Promise.all([loadOverview(), loadActivity(), loadMatches(), loadSources(), loadDocuments(), loadProfile(), loadPipeline()]).catch(err => {
   console.error('Initial load failed:', err);
 });

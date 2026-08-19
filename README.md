@@ -1,24 +1,67 @@
-# Orbit — job-search agent prototype
+# Gighunter
 
-This is a dependency-free product prototype for an agentic job-search dashboard. Open `index.html` in a modern browser to use the UI.
+**Author:** Michael Cumberland
 
-## Production architecture
+Gighunter is a local-first job search agent that polls approved job sources, scores listings against your profile, drafts tailored application materials from your real resume facts, and helps you review and apply — without ever auto-submitting.
 
-1. **Source connectors** pull permitted feeds, email alerts, ATS career pages, and approved job-site integrations on a schedule.
-2. **Normalizer + deduplicator** stores positions in a database and prevents repeated applications.
-3. **Matching agent** compares a role against the candidate profile, skills, salary/location limits, and exclusion list.
-4. **Application agent** creates a tailored draft using approved resume variants and explicitly factual candidate data.
-5. **Review / submit gateway** logs the draft, provides a final confirmation, and then opens or uses an approved submission integration.
+> The codebase and UI still use the working title **Orbit** in places (package name, branding). Gighunter is the product name.
 
-## Important implementation boundaries
+## Features
 
-- Do not scrape or bypass access controls, CAPTCHAs, or site terms. Prefer official APIs, alert emails, RSS feeds, direct employer career pages, and ATS integrations.
-- Keep a final approval step for each application or a narrowly scoped approval policy. Automated submissions can answer screening questions incorrectly, create duplicate applications, or violate a board's rules.
-- Store credentials in a secrets manager, encrypt candidate documents, and retain an audit log of source, draft, and submission status.
+- **Multi-source job polling** — Remotive, Himalayas, Adzuna, USAJOBS, and RSS feeds via official APIs
+- **Smart matching** — Skills, salary, location, and exclusion-based scoring (0–100)
+- **Application drafting** — Rule-based and LLM-assisted tailoring with strict honesty constraints
+- **Resume export** — ATS-friendly `.docx` generation per application
+- **Web dashboard** — Overview, matches, pipeline, sources, documents, and settings
+- **Telegram notifications** — Optional digest of strong matches and mobile resume delivery
+- **MCP integration** — Optional `auto/` layer for Claude Code agent workflows
 
-## Next build steps
+## Quick start
 
-- Add authentication and a candidate profile editor.
-- Implement approved source adapters with OAuth/API keys where available.
-- Add a background worker and scheduler, persistent database, and email/SMS digest.
-- Connect a document generator and a human-controlled browser handoff for application completion.
+```bash
+npm install
+cp server/.env.example server/.env      # Add API keys as needed
+cp server/profile.example.json server/profile.json  # Edit with your details
+npm run seed
+npm run dev
+```
+
+Open **http://127.0.0.1:3000** and click **Run agent**.
+
+See [server/README.md](./server/README.md) for full setup, configuration, and usage.
+
+## Project structure
+
+| Directory | Description |
+|-----------|-------------|
+| [server/](./server/) | Fastify API, pipeline, connectors, SQLite, LLM |
+| [public/](./public/) | Static web dashboard |
+| [auto/](./auto/) | MCP server + auto-draft scheduler |
+
+## Documentation
+
+- [Server README](./server/README.md) — Installation, configuration, usage
+- [Architecture](./server/docs/architecture.md) — System design and data flow
+- [REST API](./server/docs/api.md) — Endpoint reference
+- [Auto/MCP](./auto/README.md) — Agent integration and auto-drafting
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start server with hot reload |
+| `npm run start` | Start server |
+| `npm run seed` | Sync profile → database |
+| `npm run mine` | LLM bullet extraction from documents |
+| `npm run mcp` | Start MCP server (auto workspace) |
+
+## Important boundaries
+
+- Connectors use **official APIs only** — no scraping or access-control bypass
+- **Nothing is auto-submitted** — approving an application only unlocks the real posting URL
+- Server binds **127.0.0.1 only** — designed as a local single-user tool
+- Personal data (`profile.json`, database, documents) stays on your machine (gitignored)
+
+## License
+
+Private project.

@@ -1,6 +1,7 @@
 import { db } from '../db/index.js';
 import { newId } from '../util/id.js';
 import { logAudit } from '../db/audit.js';
+import { containsWholeWord, countWholeWordMatches } from '../util/text.js';
 import type { Candidate, JobRow, ApplicationRow } from '../db/types.js';
 
 export interface Draft {
@@ -14,13 +15,13 @@ export function buildDraft(job: JobRow, candidate: Candidate): Draft {
   const haystack = `${job.title} ${job.description ?? ''}`.toLowerCase();
 
   const relevantBullets = candidate.resumeBullets
-    .map(bullet => ({ bullet, hits: bullet.keywords.filter(k => haystack.includes(k.toLowerCase())).length }))
+    .map(bullet => ({ bullet, hits: countWholeWordMatches(haystack, bullet.keywords) }))
     .filter(entry => entry.hits > 0)
     .sort((a, b) => b.hits - a.hits)
     .map(entry => entry.bullet);
 
   const chosenBullets = (relevantBullets.length > 0 ? relevantBullets : candidate.resumeBullets).slice(0, 4);
-  const matchedSkills = candidate.skills.filter(skill => haystack.includes(skill.toLowerCase()));
+  const matchedSkills = candidate.skills.filter(skill => containsWholeWord(haystack, skill));
   const topSkill = matchedSkills[0] ?? candidate.skills[0] ?? candidate.name;
 
   const headline = `${candidate.name} — ${topSkill} for ${job.title} at ${job.company}`;

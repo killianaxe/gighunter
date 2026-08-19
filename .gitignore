@@ -6,12 +6,19 @@ auto/node_modules/
 dist/
 auto/dist/
 
-# secrets — real API keys live only on this machine
+# secrets — real API keys live only on this machine.
+# The .* patterns also catch stray backups like .env.bak.20260819; the
+# negations keep the committed template files tracked.
 server/.env
+server/.env.*
+!server/.env.example
 auto/.env
+auto/.env.*
+!auto/.env.example
 
 # personal data — your real profile, resumes, DB, and generated resumes never leave this machine
 server/profile.json
+server/profile.json.*
 server/data/
 auto/downloads/
 auto/logs/
@@ -19,3 +26,7 @@ auto/logs/
 # editor/OS
 .DS_Store
 *:Zone.Identifier
+
+# machine-local: theme rollback copies and auto-accumulated permission grants
+public/.backup/
+.claude/settings.local.json

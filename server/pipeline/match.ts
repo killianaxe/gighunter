@@ -1,6 +1,7 @@
 import { db } from '../db/index.js';
 import { newId } from '../util/id.js';
 import { getAppSettings } from '../db/settings.js';
+import { containsWholeWord, countWholeWordMatches } from '../util/text.js';
 import type { Candidate, JobRow } from '../db/types.js';
 
 export interface MatchResult {
@@ -49,7 +50,9 @@ const SKILL_FAMILIES: Record<string, string[]> = {
 function bestFamilyMatch(haystack: string, target: number): { name: string; matched: number; fraction: number } {
   let best = { name: '', matched: 0, fraction: 0 };
   for (const [name, terms] of Object.entries(SKILL_FAMILIES)) {
-    const matched = terms.filter(term => haystack.includes(term)).length;
+    // Whole-word, not substring: "storage" contains "rag" and would otherwise score every
+    // storage-heavy infrastructure posting as an AI match. See util/text.ts.
+    const matched = countWholeWordMatches(haystack, terms);
     const fraction = Math.min(matched / Math.min(target, terms.length), 1);
     if (fraction > best.fraction) best = { name, matched, fraction };
   }
@@ -71,7 +74,7 @@ export function scoreJob(job: JobRow, candidate: Candidate, targets: ScoringTarg
   // The better of two views: the flat profile list (so editing Skills in settings still
   // matters) and the best-matching family (so a specialist posting isn't marked down for
   // ignoring unrelated parts of the profile). Whichever fits the posting better wins.
-  const matchedSkills = candidate.skills.filter(skill => skillsHaystack.includes(skill.toLowerCase()));
+  const matchedSkills = candidate.skills.filter(skill => containsWholeWord(skillsHaystack, skill));
   const flatFraction =
     candidate.skills.length > 0
       ? Math.min(matchedSkills.length / Math.min(targets.skillTarget, candidate.skills.length), 1)
@@ -118,13 +121,6 @@ function matchesExclusion(job: JobRow, term: string): boolean {
     : `${job.title} ${job.description ?? ''} ${job.location ?? ''}`.toLowerCase();
 
   return containsWholeWord(haystack, trimmed);
-}
-
-/** Word-boundary match so short exclusion terms (e.g. "intern") don't false-positive inside longer words ("international"). */
-function containsWholeWord(haystack: string, term: string): boolean {
-  const escaped = term.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  if (!escaped) return false;
-  return new RegExp(`\\b${escaped}\\b`, 'i').test(haystack);
 }
 
 function salaryOverlap(

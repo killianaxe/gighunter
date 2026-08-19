@@ -12,7 +12,9 @@
     "build": "tsc",
     "seed": "tsx server/seed.ts",
     "setup": "npm install && npm run build --workspaces",
-    "mcp": "npm run mcp -w autogighunter"
+    "mcp": "npm run mcp -w autogighunter",
+    "mine": "tsx server/mine-library.ts",
+    "test": "node --import tsx --test server/**/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

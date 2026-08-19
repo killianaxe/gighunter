@@ -3,11 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
     <title>Orbit — Job Search Agent</title>
     <link rel="icon" type="image/png" href="logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -50,7 +51,7 @@
           </div>
         </div>
         <aside class="right-column">
-          <section class="progress-card"><div class="section-title"><div><p class="eyebrow">WEEKLY PROGRESS</p><h2>On track</h2></div><span class="up">↑ 18%</span></div><div class="chart"><div class="chart-y"><span>20</span><span>10</span><span>0</span></div><div class="bars"><div style="--h:35%"><i></i><small>M</small></div><div style="--h:52%"><i></i><small>T</small></div><div style="--h:25%"><i></i><small>W</small></div><div style="--h:72%"><i></i><small>T</small></div><div style="--h:90%" class="today"><i></i><small>F</small></div><div style="--h:20%"><i></i><small>S</small></div><div style="--h:20%"><i></i><small>S</small></div></div></div><div class="goal"><span id="applications-goal-label">0 applications prepared</span><div><i></i></div></div></section>
+          <section class="progress-card"><div class="section-title"><div><p class="eyebrow">WEEKLY PROGRESS</p><h2 id="activity-heading">—</h2></div><span class="up" id="activity-change" hidden></span></div><div class="chart"><div class="chart-y" id="activity-axis"><span>0</span><span>0</span><span>0</span></div><div class="bars" id="activity-bars"></div></div><div class="goal"><span id="applications-goal-label">0 applications prepared</span><div><i id="activity-goal-fill"></i></div></div></section>
           <section class="source-card" id="sources"><div class="section-title"><div><p class="eyebrow">ACTIVE SOURCES</p><h2 id="sources-heading">Watching 0 sites</h2></div><button class="add-source" id="add-source">+</button></div><ul id="source-list"><li class="empty-state">No sources yet — add one with the + button.</li></ul></section>
         </aside>
       </section>
