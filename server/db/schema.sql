@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS applications (
   draft_summary TEXT,
   draft_bullets_json TEXT NOT NULL DEFAULT '[]',
   tailoring_json TEXT,
+  -- When the tailored .docx was last delivered to Telegram; see migrate.ts.
+  resume_sent_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   decided_at TEXT,
   UNIQUE(job_id, candidate_id)
@@ -83,7 +85,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Key/value app settings (notifier config). Unlike `candidates`, these describe how Orbit
+-- Key/value app settings (notifier config). Unlike `candidates`, these describe how Gighunter
 -- behaves rather than who the candidate is, so they get their own table.
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,

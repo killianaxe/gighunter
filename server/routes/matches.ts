@@ -11,7 +11,8 @@ export async function matchesRoutes(app: FastifyInstance) {
       SELECT j.id AS jobId, j.title, j.company, j.location, j.url,
              j.salary_min AS salaryMin, j.salary_max AS salaryMax, j.posted_at AS postedAt,
              m.score, m.rationale,
-             a.id AS applicationId, a.status AS applicationStatus
+             a.id AS applicationId, a.status AS applicationStatus,
+             a.resume_sent_at AS resumeSentAt
       FROM matches m
       JOIN jobs j ON j.id = m.job_id
       LEFT JOIN applications a ON a.job_id = j.id AND a.candidate_id = m.candidate_id

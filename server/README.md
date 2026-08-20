@@ -4,11 +4,16 @@
 
 Gighunter is a local-first job search agent. The server polls approved job sources on a schedule, scores listings against your profile, drafts tailored application materials from your real resume facts, and exposes everything through a REST API and a bundled web dashboard.
 
-> **Naming note:** The codebase and UI still use the working title **Orbit** in many places (package name, Telegram messages, UI branding). Gighunter is the product name; Orbit refers to the same system.
+> **Naming note:** The codebase and UI still use the working title **Gighunter** in many places (package name, Telegram messages, UI branding). Gighunter is the product name; Gighunter refers to the same system.
 
 ## What it does
 
-1. **Source connectors** — Pull listings from Remotive, Himalayas, Adzuna, USAJOBS, and custom RSS feeds via official APIs (no scraping).
+1. **Source connectors** — Pull listings from Remotive, Himalayas, Adzuna, USAJOBS, Jooble, Remote OK,
+   Jobicy, Arbeitnow, The Muse, and custom RSS feeds via official APIs (no scraping).
+   Only Remotive, Adzuna, Himalayas, USAJOBS and Jooble accept a search query. Remote OK, Arbeitnow,
+   Jobicy and The Muse do not search usefully, so Gighunter fetches what they offer and applies the
+   search term itself — see `server/connectors/relevance.ts`. Each board's `search` capability flag
+   reports which case it is.
 2. **Normalizer + deduplicator** — Stores jobs in SQLite and dedupes by normalized title/company key.
 3. **Matching engine** — Scores each job (0–100) against skills, salary range, location preferences, and exclusion keywords.
 4. **Application drafting** — Builds headline, summary, and bullet selections from your profile; optional LLM tailoring via Anthropic.
@@ -231,6 +236,27 @@ Two paths:
 2. **LLM tailoring** — Agent reads `GET .../tailoring-context`, writes tailoring, saves via `POST .../tailoring`. Same Zod schema and honesty rules as the SDK path in `llm/tailor.ts`.
 
 Generated resumes export as ATS-friendly `.docx` (Georgia font, no tables/text boxes).
+
+### Cover letters
+
+Every application also has a cover letter at `GET /api/applications/:id/cover-letter.docx`, rendered
+as a one-page block-format business letter in the resume's own typography.
+
+The letter body travels inside the tailoring (`tailoring_json.coverLetter`) rather than in its own
+column, so the resume and the letter are written in a single pass against the same job description
+and the same honesty rules — the letter cannot claim something the resume does not support.
+
+The model supplies only a nullable `recipient` and four body paragraphs. The greeting, letterhead,
+date, and sign-off are rendered in code, which is what makes "never *To Whom It May Concern*" and
+"never a guessed hiring-manager name" structural rather than a request in a prompt. Length is
+checked on save (120–500 words, targeting 250–400).
+
+There are two tiers, and the `X-Letter-Source` response header says which you got:
+
+- `tailored` — written for this posting by an agent via `POST .../tailoring`.
+- `template` — assembled from the candidate's own matched bullets with no LLM. Accurate, but
+  generic in its "why this company" paragraph. This exists so the auto-scheduler and the Telegram
+  notifier, neither of which calls a model, never deliver a resume with no letter beside it.
 
 ## API reference
 

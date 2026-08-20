@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>Orbit — Job Search Agent</title>
+    <title>Gighunter — Job Search Agent</title>
     <link rel="icon" type="image/png" href="logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,7 +13,7 @@
   </head>
   <body>
     <aside class="sidebar">
-      <a class="brand" href="#"><img class="brand-mark" src="logo.png" alt="Red Shift Cybersecurity" /> Orbit</a>
+      <a class="brand" href="#"><img class="brand-mark" src="logo.png" alt="Red Shift Cybersecurity" /> Gighunter</a>
       <nav>
         <a class="nav-link active" href="#overview"><span>⌘</span> Overview</a>
         <a class="nav-link" href="#matches"><span>◈</span> Matches <b id="nav-matches-count">0</b></a>
@@ -66,7 +66,7 @@
       </section>
       <section class="documents-card" id="documents">
         <div class="section-title"><div><p class="eyebrow">YOUR DOCUMENTS</p><h2>Resumes &amp; CVs on file</h2></div></div>
-        <p class="documents-hint">Drop resume/CV files straight into <code id="documents-folder-path">server/data/documents</code> — they'll show up here automatically. These are your source files; Orbit never edits them. The tailored resume for a specific job lives in that job's Review dialog instead.</p>
+        <p class="documents-hint">Drop resume/CV files straight into <code id="documents-folder-path">server/data/documents</code> — they'll show up here automatically. These are your source files; Gighunter never edits them. The tailored resume for a specific job lives in that job's Review dialog instead.</p>
         <ul id="document-list" class="document-list"><li class="empty-state">No documents yet.</li></ul>
       </section>
       <section class="settings-card" id="settings">
@@ -126,6 +126,7 @@
       <ul class="dialog-bullets" id="dialog-bullets"></ul>
       <div class="review-row"><span>Match rationale</span><strong id="dialog-rationale">—</strong></div>
       <div class="review-row"><span>Tailored resume</span><a id="dialog-download" href="#" target="_blank" rel="noopener">Download .docx</a></div>
+      <div class="review-row"><span id="dialog-letter-label">Cover letter</span><a id="dialog-letter" href="#" target="_blank" rel="noopener">Download .docx</a></div>
       <button class="primary dialog-action" id="dialog-primary">Open application <span>↗</span></button>
     </dialog>
     <script src="app.js"></script>

@@ -1,7 +1,7 @@
 /* ============================================================================
-   Orbit — operations console
+   Gighunter — operations console
    ----------------------------------------------------------------------------
-   Orbit runs on a schedule whether or not anyone is watching: it polls sources,
+   Gighunter runs on a schedule whether or not anyone is watching: it polls sources,
    scores postings, drafts applications, and notifies over Telegram. The interface
    is therefore a monitoring console, not a marketing dashboard — its job is to
    show state at a glance and let one operator act on it.
@@ -86,11 +86,21 @@ body{
   border-right:1px solid var(--grid);
   padding:26px 16px;display:flex;flex-direction:column;
 }
+/* The wordmark is the one piece of type that should read as a product name rather than as
+   interface chrome, so it runs well ahead of everything else in the rail. "Gighunter" is nearly
+   twice the length of the old name, so the size is bounded by the rail rather than chosen freely:
+   308px rail - 32px padding - 44px mark - 12px gap leaves 220px for the word. At 44px in Space
+   Grotesk 700 the nine glyphs measure ~200px, which fits with room to spare and still leaves the
+   descender on the 'g' clear of the nav beneath.
+
+   nowrap is load-bearing, not decorative: .brand is a flex row holding an image and a text node,
+   so without it a narrow viewport breaks the name onto a second line under the mark. */
 .brand{
-  color:var(--text);font-size:34px;font-weight:700;text-decoration:none;
-  letter-spacing:-1.6px;margin:0 8px 34px;display:flex;align-items:center;gap:12px;
+  color:var(--text);font-size:44px;font-weight:700;text-decoration:none;
+  letter-spacing:-2px;margin:0 8px 34px;display:flex;align-items:center;gap:12px;
+  white-space:nowrap;line-height:1.05;
 }
-.brand-mark{width:38px;height:38px;object-fit:contain;background:none;border-radius:0}
+.brand-mark{width:44px;height:44px;object-fit:contain;background:none;border-radius:0;flex-shrink:0}
 
 nav{display:grid;gap:2px}
 .nav-link{
@@ -316,7 +326,7 @@ h3{font-size:14px;margin:0;font-weight:600;letter-spacing:-.2px}
 .source-icon.generic-source{background:#2a3a4c;color:var(--dim)}
 .indeed{background:#2164f3;color:#fff}.linkedin{background:#0a66c2;color:#fff}
 /* Third-party source marks keep their own brand colours — they identify a
-   service, they are not part of Orbit's signal vocabulary. */
+   service, they are not part of Gighunter's signal vocabulary. */
 .green{background:#24a26b}.lever{background:#e66351}
 /* LIVE 5 — a source that is currently enabled and polling. */
 .online{width:6px;height:6px;border-radius:50%;background:var(--live);margin-left:3px;flex:none}

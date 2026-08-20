@@ -21,33 +21,77 @@ function log(line: string): void {
 /**
  * Finds strong matches with no draft yet and auto-drafts them (tailored highlights +
  * a saved .docx resume). Never approves — that stays a deliberate, manual step, either
- * through Orbit's own Review dialog or an explicit orbit_approve_application tool call.
+ * through Gighunter's own Review dialog or an explicit orbit_approve_application tool call.
  */
 async function runCycle(): Promise<void> {
   await ensureOrbitRunning();
 
   const matches = await orbit.getMatches(config.autoDraftThreshold);
-  const undrafted = matches.filter(m => m.applicationStatus === null);
+  // Select on delivery, not on drafting. Gighunter's notifier drafts every match it announces so
+  // the Telegram digest can link a resume that exists, which means "has no application row" no
+  // longer means "resume not sent" — filtering on that would find nothing here and quietly end
+  // mobile delivery. resumeSentAt is the actual signal.
+  const undelivered = matches.filter(m => m.resumeSentAt === null);
 
-  if (undrafted.length === 0) {
-    log(`Cycle complete: no new matches at or above ${config.autoDraftThreshold}%.`);
+  if (undelivered.length === 0) {
+    log(`Cycle complete: no undelivered matches at or above ${config.autoDraftThreshold}%.`);
     return;
   }
 
-  for (const match of undrafted) {
+  for (const match of undelivered) {
     try {
-      const application = await orbit.draftApplication(match.jobId);
-      const resumePath = await orbit.downloadResume(application.id);
-      log(`Auto-drafted "${match.title}" @ ${match.company} (${match.score}%) → ${resumePath}`);
+      /**
+       * Draft ONLY when no application exists yet. Re-drafting an existing one is destructive:
+       * draftApplication upserts and overwrites draft_headline / draft_summary /
+       * draft_bullets_json (server/pipeline/draft.ts), and orbit_save_tailoring writes the
+       * tailored summary and bullets into those same columns — which is what the .docx renders.
+       * So re-drafting a tailored application silently replaces real tailoring with the
+       * mechanical keyword template, and an approved application with a draft the user never saw.
+       *
+       * This was safe only while the cycle selected on "not yet drafted", which by definition
+       * meant no application existed. Selecting on delivery reaches drafted, tailored and
+       * approved rows alike, so the guard has to be explicit.
+       */
+      const applicationId = match.applicationId ?? (await orbit.draftApplication(match.jobId)).id;
+      const verb = match.applicationId ? 'Prepared' : 'Auto-drafted';
+      const resumePath = await orbit.downloadResume(applicationId);
+      log(`${verb} "${match.title}" @ ${match.company} (${match.score}%) → ${resumePath}`);
+
+      // The cover letter is a separate artifact and a separate failure. It is saved even when it
+      // is only the deterministic template, because a generic letter that needs one paragraph
+      // rewritten still beats sitting down to a blank page — but the tier is logged so a template
+      // is never mistaken for a finished letter.
+      try {
+        const letter = await orbit.downloadCoverLetter(applicationId);
+        log(`  → ${letter.source} cover letter → ${letter.path}`);
+      } catch (err) {
+        log(`  → cover letter skipped: ${err instanceof Error ? err.message : err}`);
+      }
 
       // Delivery is best-effort and deliberately separate from drafting: a Telegram outage,
       // a disabled notifier, or missing credentials must not lose the draft that already
       // succeeded. The resume is on disk either way; this only adds the mobile copy.
       try {
-        const sent = await orbit.sendResumeToTelegram(application.id);
+        const sent = await orbit.sendResumeToTelegram(applicationId);
         log(`  → sent ${sent.filename} to Telegram (${sent.bytes} bytes)`);
       } catch (err) {
-        log(`  → Telegram delivery skipped: ${err instanceof Error ? err.message : err}`);
+        const message = err instanceof Error ? err.message : String(err);
+        log(`  → Telegram delivery skipped: ${message}`);
+
+        /**
+         * A disabled or unconfigured notifier is a standing condition, not a transient failure,
+         * and resume_sent_at is only stamped on a successful send. Without this the cycle grinds
+         * through every strong match every interval — re-downloading a resume and a cover letter
+         * for each — and does so forever, because nothing can ever mark them delivered.
+         *
+         * A genuine outage still retries: only these two states abandon the cycle, and the
+         * remaining matches keep their null resume_sent_at so the next cycle picks them up once
+         * the notifier is switched back on.
+         */
+        if (/telegram (disabled|unconfigured)/i.test(message)) {
+          log('Notifier is off — abandoning this cycle rather than re-preparing every match.');
+          return;
+        }
       }
     } catch (err) {
       log(`Failed to auto-draft "${match.title}" @ ${match.company}: ${err instanceof Error ? err.message : err}`);

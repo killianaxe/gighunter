@@ -5,8 +5,9 @@ import { draftApplication } from '../pipeline/draft.js';
 import { buildResumeDocx, resumeFilename } from '../pipeline/resume.js';
 import { logAudit } from '../db/audit.js';
 import { newId } from '../util/id.js';
-import { TAILORING_RULES, TailoredApplicationSchema, candidateBrief } from '../llm/tailor.js';
-import { sendResumeDocument } from '../notify/telegram.js';
+import { TAILORING_RULES, TailoredApplicationSchema, candidateBrief, checkCoverLetterLength } from '../llm/tailor.js';
+import { buildCoverLetterDocx, coverLetterFilename } from '../pipeline/cover-letter.js';
+import { sendCoverLetterDocument, sendResumeDocument, type ResumeDelivery } from '../notify/telegram.js';
 import type { ApplicationRow, JobRow } from '../db/types.js';
 
 function serializeApplication(application: ApplicationRow, job: JobRow) {
@@ -74,6 +75,8 @@ export async function applicationsRoutes(app: FastifyInstance) {
         keywordGaps: 'string[] — terms this posting wants that the candidate genuinely lacks',
         coveredButUnstated: 'string[] — terms the candidate evidences but never names literally',
         fitAssessment: 'string — one honest sentence, including reasons not to apply',
+        coverLetter:
+          '{ recipient, opening, fitParagraph, interestParagraph, closingParagraph } — recipient is null unless the posting names the hiring manager; the four paragraphs total 250-400 words. Do NOT write the greeting or sign-off; the renderer adds them.',
       },
     };
   });
@@ -96,6 +99,15 @@ export async function applicationsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'tailoring does not match the expected shape', issues: parsed.error.issues });
     }
     const tailoring = parsed.data;
+
+    // Length is the one cover-letter rule the schema cannot express, and the one a reader
+    // notices first. Rejecting here gives the agent a specific correction to act on, which is
+    // the same contract the Zod failure above offers.
+    const lengthProblem = checkCoverLetterLength(tailoring.coverLetter);
+    if (lengthProblem) {
+      return reply.code(400).send({ error: lengthProblem, field: 'coverLetter' });
+    }
+
     const candidate = getDefaultCandidate();
 
     db.prepare(
@@ -150,9 +162,32 @@ export async function applicationsRoutes(app: FastifyInstance) {
   });
 
   /**
+   * Downloadable .docx cover letter for this application.
+   *
+   * Always renders something: a stored tailoring supplies the real letter, and anything else
+   * falls back to a letter assembled from the candidate's own matched bullets. The X-Letter-Source
+   * header says which, so a caller can tell a finished letter from a starting point without
+   * opening the file.
+   */
+  app.get('/api/applications/:id/cover-letter.docx', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const application = db.prepare(`SELECT * FROM applications WHERE id = ?`).get(id) as ApplicationRow | undefined;
+    if (!application) return reply.code(404).send({ error: 'application not found' });
+    const job = db.prepare(`SELECT * FROM jobs WHERE id = ?`).get(application.job_id) as JobRow;
+    const candidate = getDefaultCandidate();
+
+    const { buffer, source } = await buildCoverLetterDocx(application, job, candidate);
+    return reply
+      .header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+      .header('Content-Disposition', `attachment; filename="${coverLetterFilename(candidate, job)}"`)
+      .header('X-Letter-Source', source)
+      .send(buffer);
+  });
+
+  /**
    * Pushes the tailored .docx into Telegram.
    *
-   * The download route above serves from 127.0.0.1, which only exists on the machine Orbit runs
+   * The download route above serves from 127.0.0.1, which only exists on the machine Gighunter runs
    * on — so on a phone the digest announces a match the candidate then cannot attach a resume
    * to. Sending the bytes through the bot closes that loop: the file arrives in the chat, Android
    * saves it to Downloads, and the browser's upload picker can reach it.
@@ -177,7 +212,29 @@ export async function applicationsRoutes(app: FastifyInstance) {
         score: score?.score ?? null,
       });
       if (delivery.skipped) return reply.code(409).send({ error: `telegram ${delivery.skipped}`, ...delivery });
-      return delivery;
+      // Recorded only after Telegram accepted the upload, so a failed send stays "not delivered"
+      // and the next scheduler cycle retries rather than dropping the resume.
+      db.prepare(`UPDATE applications SET resume_sent_at = datetime('now') WHERE id = ?`).run(id);
+
+      // The cover letter follows as a second document, best-effort. The resume is the primary
+      // artifact and has already landed; a letter that fails to upload must not roll back the
+      // delivery stamp and cause the scheduler to re-send the resume on every future cycle.
+      let coverLetter: (ResumeDelivery & { source?: string }) | { error: string };
+      try {
+        const { buffer: letterBuffer, source } = await buildCoverLetterDocx(application, job, candidate);
+        coverLetter = {
+          ...(await sendCoverLetterDocument(letterBuffer, coverLetterFilename(candidate, job), {
+            title: job.title,
+            company: job.company,
+            source,
+          })),
+          source,
+        };
+      } catch (err) {
+        coverLetter = { error: err instanceof Error ? err.message : String(err) };
+      }
+
+      return { ...delivery, coverLetter };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return reply.code(502).send({ error: message });

@@ -5,6 +5,11 @@ import { fetchRss } from '../connectors/rss.js';
 import { fetchAdzuna } from '../connectors/adzuna.js';
 import { fetchHimalayas } from '../connectors/himalayas.js';
 import { fetchUsajobs } from '../connectors/usajobs.js';
+import { fetchRemoteOk } from '../connectors/remoteok.js';
+import { fetchArbeitnow } from '../connectors/arbeitnow.js';
+import { fetchJobicy } from '../connectors/jobicy.js';
+import { fetchTheMuse } from '../connectors/themuse.js';
+import { fetchJooble } from '../connectors/jooble.js';
 import { normalizedKey } from './normalize.js';
 import { logAudit } from '../db/audit.js';
 import type { SourceRow, NormalizedListing, SourceType } from '../db/types.js';
@@ -15,6 +20,11 @@ const CONNECTORS: Record<SourceType, (query: string) => Promise<NormalizedListin
   adzuna: fetchAdzuna,
   himalayas: fetchHimalayas,
   usajobs: fetchUsajobs,
+  remoteok: fetchRemoteOk,
+  arbeitnow: fetchArbeitnow,
+  jobicy: fetchJobicy,
+  themuse: fetchTheMuse,
+  jooble: fetchJooble,
 };
 
 export interface PollSummary {

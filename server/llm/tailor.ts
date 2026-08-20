@@ -9,6 +9,69 @@ const TailoredBullet = z.object({
   changed: z.boolean().describe('False when the original already fits and was returned unmodified.'),
 });
 
+/**
+ * The cover letter's body, paragraph by paragraph — deliberately not one free-text blob.
+ *
+ * Splitting it means the renderer, not the model, owns the parts that are rules rather than
+ * prose: the greeting, the sign-off, and the letterhead. A model asked for a whole letter will
+ * eventually produce "To Whom It May Concern" or drop the sign-off; a model asked only for
+ * `recipient` plus four paragraphs cannot. Structure enforces what a prompt can only request.
+ */
+export const CoverLetterSchema = z.object({
+  recipient: z
+    .string()
+    .nullable()
+    .describe(
+      'The hiring manager\'s name with honorific, exactly as the posting gives it (e.g. "Ms. Rivera"). Null unless the posting actually names the person — a guessed name is far worse than no name.'
+    ),
+  opening: z
+    .string()
+    .describe(
+      'Introduction: who the candidate is and which role they are applying for, named exactly as the posting titles it. Lead with a concrete accomplishment or a specific reason for applying — never "I am writing to apply for".'
+    ),
+  fitParagraph: z
+    .string()
+    .describe(
+      'Why the candidate fits: two or three specific achievements from their material with every metric intact, mapped onto what this posting asks for. Explain what those achievements mean for this employer rather than restating the resume in prose.'
+    ),
+  interestParagraph: z
+    .string()
+    .describe(
+      'Why this role at this company, grounded in something the posting actually says. If the posting gives nothing concrete to point at, tie the interest to the work itself — never invent enthusiasm about a company you know nothing about.'
+    ),
+  closingParagraph: z
+    .string()
+    .describe('Brief close: restate the fit in one sentence and invite an interview. No new claims.'),
+});
+
+export type CoverLetter = z.infer<typeof CoverLetterSchema>;
+
+/**
+ * A cover letter should be about one page. Enforced in code rather than by prompt because
+ * length is the failure mode reviewers actually notice, and it is trivially measurable.
+ * The bounds are deliberately loose — they catch a stub and a three-pager, not a long paragraph.
+ */
+export const COVER_LETTER_WORD_RANGE = { min: 120, max: 500 } as const;
+
+export function coverLetterWordCount(letter: CoverLetter): number {
+  return [letter.opening, letter.fitParagraph, letter.interestParagraph, letter.closingParagraph]
+    .join(' ')
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+/** Returns a human-readable complaint, or null when the letter is a sane length. */
+export function checkCoverLetterLength(letter: CoverLetter): string | null {
+  const words = coverLetterWordCount(letter);
+  if (words < COVER_LETTER_WORD_RANGE.min) {
+    return `cover letter is only ${words} words; a real letter runs ${COVER_LETTER_WORD_RANGE.min}-${COVER_LETTER_WORD_RANGE.max}`;
+  }
+  if (words > COVER_LETTER_WORD_RANGE.max) {
+    return `cover letter is ${words} words; it must fit one page (at most ${COVER_LETTER_WORD_RANGE.max})`;
+  }
+  return null;
+}
+
 export const TailoredApplicationSchema = z.object({
   headline: z.string().describe('One line positioning the candidate for this specific role. No template phrasing.'),
   summary: z.string().describe('Two or three sentences of professional summary aimed at this posting.'),
@@ -22,6 +85,7 @@ export const TailoredApplicationSchema = z.object({
     .array(z.string())
     .describe('Terms the posting wants that the candidate demonstrably has but never names literally (e.g. holds VCP-Network Virtualization but never writes "NSX").'),
   fitAssessment: z.string().describe('One honest sentence on fit, including reasons not to apply if they exist.'),
+  coverLetter: CoverLetterSchema.describe('The cover letter body for this posting. Same honesty rules as the bullets.'),
 });
 
 export type TailoredApplication = z.infer<typeof TailoredApplicationSchema>;
@@ -40,7 +104,19 @@ Lead with what this posting cares about. If the posting is about disaster recove
 coveredButUnstated IS THE HIGH-VALUE FIELD:
 Find cases where the candidate genuinely has what the posting wants but never uses the posting's word for it — a certification that implies a product ("VCP-Network Virtualization" implies NSX), an older product name, an implied skill. These are silent ATS failures. Be rigorous: only list something the candidate's material actually evidences.
 
-fitAssessment MUST BE HONEST. If the candidate is a weak fit, say so plainly. A tool that tells someone not to waste an application is more valuable than one that flatters.`;
+fitAssessment MUST BE HONEST. If the candidate is a weak fit, say so plainly. A tool that tells someone not to waste an application is more valuable than one that flatters.
+
+THE COVER LETTER:
+Write it for this one posting. A letter that would work unchanged for another company has failed — name the role exactly as the posting titles it, and point at something the posting actually says.
+
+- Every honesty rule above applies without exception. The letter is prose, which makes fabrication easier and no more acceptable.
+- Do not restate the resume in paragraph form. The bullets say WHAT the candidate did; the letter says what that means for THIS employer. If a sentence would be redundant next to the resume, cut it.
+- Use concrete achievements with their numbers intact. "Cut recovery time to a 15-minute RPO" beats "strong disaster recovery background".
+- Vary sentence openings — a letter where most sentences begin with "I" reads as a list.
+- 250 to 400 words across the four paragraphs. One page, no exceptions.
+- Leave out anything a resume would not carry: age, marital status, health, politics, salary history.
+- recipient: only a name the posting itself provides. Null otherwise. The renderer writes the greeting; you never do.
+- interestParagraph is where letters go generic. If the posting says nothing about the company beyond boilerplate, write about the substance of the work instead of praising a company you have no information about. Vague flattery is worse than none.`;
 
 export interface TailoringOutcome extends TailoredApplication {
   usage: { inputTokens: number; outputTokens: number; costUsd: number };

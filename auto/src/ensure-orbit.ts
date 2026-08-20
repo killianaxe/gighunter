@@ -32,13 +32,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
 }
 
-/** Checks Orbit's health; auto-starts it via WSL if configured and waits for it to come up. */
+/** Checks Gighunter's health; auto-starts it via WSL if configured and waits for it to come up. */
 export async function ensureOrbitRunning(): Promise<void> {
   if (await isOrbitUp()) return;
 
   if (!config.autoStartOrbit) {
     throw new Error(
-      `Orbit isn't running at ${config.orbitBaseUrl}. Start it with "npm run dev" in gighunter, or set AUTO_START_ORBIT=true.`
+      `Gighunter isn't running at ${config.orbitBaseUrl}. Start it with "npm run dev" in gighunter, or set AUTO_START_ORBIT=true.`
     );
   }
 
@@ -50,5 +50,5 @@ export async function ensureOrbitRunning(): Promise<void> {
     if (await isOrbitUp()) return;
   }
 
-  throw new Error(`Timed out waiting for Orbit to come up at ${config.orbitBaseUrl} after auto-start.`);
+  throw new Error(`Timed out waiting for Gighunter to come up at ${config.orbitBaseUrl} after auto-start.`);
 }

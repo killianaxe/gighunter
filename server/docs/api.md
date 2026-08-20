@@ -350,7 +350,8 @@ Everything an agent needs to LLM-tailor an application.
     "leadCertifications": "string[] — certifications ordered by relevance",
     "keywordGaps": "string[] — terms this posting wants that the candidate genuinely lacks",
     "coveredButUnstated": "string[] — terms the candidate evidences but never names literally",
-    "fitAssessment": "string — one honest sentence, including reasons not to apply"
+    "fitAssessment": "string — one honest sentence, including reasons not to apply",
+    "coverLetter": "{ recipient, opening, fitParagraph, interestParagraph, closingParagraph } — ..."
   }
 }
 ```
@@ -376,9 +377,22 @@ Save an agent-produced tailoring. Validated against `TailoredApplicationSchema`.
   "leadCertifications": ["VCP-DCV"],
   "keywordGaps": ["Kubernetes"],
   "coveredButUnstated": ["NSX"],
-  "fitAssessment": "Strong fit for virtualization-focused role; gap in container orchestration."
+  "fitAssessment": "Strong fit for virtualization-focused role; gap in container orchestration.",
+  "coverLetter": {
+    "recipient": null,
+    "opening": "I am applying for the Senior Virtualization Engineer role at Example Corp...",
+    "fitParagraph": "Two or three achievements with metrics intact, mapped to this posting...",
+    "interestParagraph": "Why this role at this company, grounded in what the posting says...",
+    "closingParagraph": "Restates the fit in one sentence and invites an interview."
+  }
 }
 ```
+
+`coverLetter` is required. Note what it does **not** contain: no greeting, no sign-off, no
+letterhead. Those are rendered in code, which is how "never *To Whom It May Concern*" and "never a
+guessed hiring-manager name" become structural guarantees instead of prompt instructions. Set
+`recipient` only when the posting itself names the hiring manager; otherwise `null` produces
+"Dear Hiring Manager,".
 
 **Response:** Same as draft endpoint, with `tailoring` populated.
 
@@ -386,6 +400,8 @@ Save an agent-produced tailoring. Validated against `TailoredApplicationSchema`.
 
 - `404` if job not found
 - `400` with `{ error, issues }` if validation fails
+- `400` with `{ error, field: "coverLetter" }` if the four paragraphs total under 120 or over 500
+  words — the target is 250–400, i.e. one page
 
 ### `GET /api/applications/:id`
 
@@ -403,9 +419,34 @@ Download tailored resume as Word document.
 
 **Errors:** `404` if application not found
 
+### `GET /api/applications/:id/cover-letter.docx`
+
+Download the cover letter as a Word document — a one-page block-format business letter in the
+resume's typography.
+
+Always returns a document. If the application has a tailoring with a `coverLetter`, that letter is
+rendered; otherwise a letter assembled from the candidate's own matched bullets is.
+
+**Response:** Binary `.docx` file with `Content-Disposition: attachment`
+
+**Headers:**
+
+| Header | Values | Meaning |
+|--------|--------|---------|
+| `X-Letter-Source` | `tailored` | Written for this posting via `POST .../tailoring` |
+| | `template` | Deterministic fallback — true, but generic; edit before sending |
+
+**Errors:** `404` if application not found
+
 ### `POST /api/applications/:id/telegram`
 
-Send the tailored `.docx` to configured Telegram chat.
+Send the tailored `.docx` to the configured Telegram chat, followed by the cover letter as a second
+document.
+
+Cover letter delivery is best-effort and deliberately cannot fail the call: the resume has already
+landed and `resume_sent_at` is already stamped, so a letter upload error must not cause the
+scheduler to re-send the resume on every subsequent cycle. A failure is reported in
+`coverLetter.error` instead.
 
 **Response:**
 
@@ -413,7 +454,13 @@ Send the tailored `.docx` to configured Telegram chat.
 {
   "filename": "YourName_ExampleCorp_SeniorEngineer.docx",
   "bytes": 12345,
-  "skipped": null
+  "skipped": null,
+  "coverLetter": {
+    "filename": "YourName_ExampleCorp_SeniorEngineer_CoverLetter.docx",
+    "bytes": 9597,
+    "skipped": null,
+    "source": "template"
+  }
 }
 ```
 

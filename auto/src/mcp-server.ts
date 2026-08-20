@@ -96,7 +96,7 @@ server.registerTool(
   'orbit_send_resume_to_telegram',
   {
     description:
-      "Sends the tailored .docx resume for an application into the Telegram chat, where it can be saved on a phone and attached to the real application from there. Use this when the candidate is away from the machine Orbit runs on — the normal download link points at localhost and does not work on mobile. Requires the Telegram notifier to be configured and enabled.",
+      "Sends the tailored .docx resume for an application into the Telegram chat, where it can be saved on a phone and attached to the real application from there. Use this when the candidate is away from the machine Gighunter runs on — the normal download link points at localhost and does not work on mobile. Requires the Telegram notifier to be configured and enabled.",
     inputSchema: z.object({ applicationId: z.string().min(1) }),
   },
   async ({ applicationId }) => text(await withOrbit(() => orbit.sendResumeToTelegram(applicationId)))
@@ -131,14 +131,14 @@ server.registerTool(
 
 /**
  * The tailoring pair. These are what let a Claude Code session do the tailoring itself instead of
- * Orbit paying for an API call: the agent reads the context, reasons, and writes the result back.
- * Orbit stays mechanical — it serves material and stores an answer, and never calls a model.
+ * Gighunter paying for an API call: the agent reads the context, reasons, and writes the result back.
+ * Gighunter stays mechanical — it serves material and stores an answer, and never calls a model.
  */
 server.registerTool(
   'orbit_tailoring_context',
   {
     description:
-      "Everything needed to tailor a resume for one job: the posting, the candidate's full accomplishment library, and Orbit's honesty rules (never invent experience; preserve every metric, date, and proper noun exactly). Read this, write the tailoring yourself, then save it with orbit_save_tailoring.",
+      "Everything needed to tailor a resume for one job: the posting, the candidate's full accomplishment library, and Gighunter's honesty rules (never invent experience; preserve every metric, date, and proper noun exactly). Read this, write the tailoring yourself, then save it with orbit_save_tailoring.",
     inputSchema: z.object({ jobId: z.string().min(1) }),
   },
   async ({ jobId }) => text(await withOrbit(() => orbit.getTailoringContext(jobId)))
@@ -148,7 +148,7 @@ server.registerTool(
   'orbit_save_tailoring',
   {
     description:
-      'Saves a tailoring you wrote for a job, replacing the placeholder draft. Orbit validates the shape and returns 400 with specific issues if anything is missing — fix and resend. Every bullet\'s tailoredText must be a rewrite of real candidate material, never new experience.',
+      'Saves a tailoring you wrote for a job, replacing the placeholder draft. Gighunter validates the shape and returns 400 with specific issues if anything is missing — fix and resend. Every bullet\'s tailoredText must be a rewrite of real candidate material, never new experience.',
     inputSchema: z.object({
       jobId: z.string().min(1),
       headline: z.string().min(1).describe('One line positioning the candidate for this specific role. No template phrasing.'),
@@ -170,9 +170,47 @@ server.registerTool(
         .array(z.string())
         .describe('Terms the posting wants that the candidate demonstrably has but never names literally (e.g. holds VCP-Network Virtualization but never writes "NSX"). These are silent ATS failures.'),
       fitAssessment: z.string().describe('One honest sentence on fit, including reasons not to apply if they exist.'),
+      coverLetter: z
+        .object({
+          recipient: z
+            .string()
+            .nullable()
+            .describe(
+              'The hiring manager\'s name with honorific, exactly as the posting gives it (e.g. "Ms. Rivera"). Null unless the posting actually names them — never guess.'
+            ),
+          opening: z
+            .string()
+            .describe(
+              'Introduction: who the candidate is and which role, titled exactly as the posting titles it. Open with a concrete accomplishment, not "I am writing to apply for".'
+            ),
+          fitParagraph: z
+            .string()
+            .describe(
+              'Two or three specific achievements with metrics intact, mapped to what this posting asks for — what they mean for this employer, not a prose copy of the resume.'
+            ),
+          interestParagraph: z
+            .string()
+            .describe(
+              'Why this role at this company, grounded in something the posting actually says. Write about the work rather than inventing praise for a company you know nothing about.'
+            ),
+          closingParagraph: z.string().describe('Restate the fit in one sentence and invite an interview. No new claims.'),
+        })
+        .describe(
+          'The cover letter body. Gighunter renders the letterhead, greeting ("Dear <recipient>," or "Dear Hiring Manager,"), and sign-off — do not write them. The four paragraphs must total 250-400 words; Gighunter rejects anything outside 120-500.'
+        ),
     }),
   },
   async ({ jobId, ...tailoring }) => text(await withOrbit(() => orbit.saveTailoring(jobId, tailoring)))
+);
+
+server.registerTool(
+  'orbit_download_cover_letter',
+  {
+    description:
+      'Generates and saves the .docx cover letter for a drafted application, formatted as a one-page business letter matching the resume. Returns the saved path and whether the letter is "tailored" (written by an agent via orbit_save_tailoring) or "template" (assembled from the candidate\'s own bullets, generic in the why-this-company paragraph and worth rewriting before sending).',
+    inputSchema: z.object({ applicationId: z.string().min(1) }),
+  },
+  async ({ applicationId }) => text(await withOrbit(() => orbit.downloadCoverLetter(applicationId)))
 );
 
 async function main() {

@@ -30,9 +30,14 @@ const BULLETS_PER_ROLE = 5;
  * parsers scramble reading order or silently drop content from all of those, and this pipeline's
  * value depends on an ATS reading the keywords correctly.
  */
-const BODY_FONT = 'Georgia';
-const BODY_SIZE = 21; // half-points → 10.5pt
-const SMALL_SIZE = 18; // 9pt, for contact and meta lines
+// Exported so the cover letter renders in the same face and sizes. The two documents arrive in the
+// same email attachment picker; a font mismatch between them reads as carelessness, and copying
+// the constants into a second file guarantees they drift the first time one is adjusted.
+export const BODY_FONT = 'Georgia';
+export const BODY_SIZE = 21; // half-points → 10.5pt
+export const SMALL_SIZE = 18; // 9pt, for contact and meta lines
+/** Candidate name at the top of both documents. */
+export const NAME_SIZE = 32; // 16pt
 
 const sectionHeading = (text: string): Paragraph =>
   new Paragraph({
@@ -103,7 +108,7 @@ export async function buildResumeDocx(application: ApplicationRow, job: JobRow, 
           new Paragraph({
             spacing: { after: 40 },
             children: [
-              new TextRun({ text: candidate.name.toUpperCase(), bold: true, size: 32, characterSpacing: 40 }),
+              new TextRun({ text: candidate.name.toUpperCase(), bold: true, size: NAME_SIZE, characterSpacing: 40 }),
             ],
           }),
           ...(candidate.headline ? [body(candidate.headline, { italics: true })] : []),

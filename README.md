@@ -4,11 +4,14 @@
 
 Gighunter is a local-first job search agent that polls approved job sources, scores listings against your profile, drafts tailored application materials from your real resume facts, and helps you review and apply — without ever auto-submitting.
 
-> The codebase and UI still use the working title **Orbit** in places (package name, branding). Gighunter is the product name.
+> The codebase and UI still use the working title **Gighunter** in places (package name, branding). Gighunter is the product name.
 
 ## Features
 
-- **Multi-source job polling** — Remotive, Himalayas, Adzuna, USAJOBS, and RSS feeds via official APIs
+- **Multi-source job polling** — ten connectors via official APIs: Remotive, Himalayas, Adzuna, USAJOBS,
+  Jooble, Remote OK, Jobicy, Arbeitnow, The Muse, and custom RSS feeds
+- **Honest capability flags** — `GET /api/sources/capabilities` states per board whether it can really
+  search, whether it reports salary, and what it costs. Boards that cannot search are filtered locally
 - **Smart matching** — Skills, salary, location, and exclusion-based scoring (0–100)
 - **Application drafting** — Rule-based and LLM-assisted tailoring with strict honesty constraints
 - **Resume export** — ATS-friendly `.docx` generation per application

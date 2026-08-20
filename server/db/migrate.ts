@@ -90,4 +90,41 @@ export function migrateApplicationsColumns(db: Database.Database): void {
   if (!existing.has('tailoring_json')) {
     db.exec('ALTER TABLE applications ADD COLUMN tailoring_json TEXT');
   }
+  /**
+   * When the tailored .docx was last pushed to Telegram.
+   *
+   * The auto-scheduler used to treat "has no application row" as "resume not delivered". That
+   * held only while drafting and delivering happened together. The notifier now drafts every
+   * announced match so the digest can link a resume that exists, which makes every strong match
+   * look drafted and would leave the scheduler with nothing to do — silently ending mobile
+   * resume delivery. Delivery is therefore tracked on its own rather than inferred.
+   *
+   * Existing rows backfill to NULL, i.e. "not delivered". That is the safe direction: the worst
+   * case is one catch-up send, whereas backfilling as sent would drop resumes on the floor.
+   */
+  if (!existing.has('resume_sent_at')) {
+    db.exec('ALTER TABLE applications ADD COLUMN resume_sent_at TEXT');
+  }
+
+  /**
+   * Backfill delivery times from the audit log, which has recorded every successful send all
+   * along. Runs unconditionally rather than only when the column is created: an earlier boot can
+   * add the column before this backfill exists, and gating on the ALTER would then skip it
+   * permanently, leaving the scheduler to re-send the whole history as duplicate documents.
+   *
+   * It is idempotent by construction — it only fills rows that are still NULL, and only from
+   * evidence that a send actually happened. logAudit writes the detail as `${title} — ${company}`,
+   * so the same concatenation reconstructs the key. Matching on that pair rather than on the
+   * stored filename avoids depending on how resumeFilename sanitises company names, which has no
+   * inverse.
+   */
+  db.exec(`
+    UPDATE applications SET resume_sent_at = (
+      SELECT MAX(al.created_at) FROM audit_log al
+      JOIN jobs j ON j.id = applications.job_id
+      WHERE al.action = 'telegram_resume_sent'
+        AND al.detail = j.title || ' — ' || j.company
+    )
+    WHERE resume_sent_at IS NULL
+  `);
 }

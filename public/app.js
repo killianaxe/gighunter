@@ -59,6 +59,8 @@ const dialogSummary = document.querySelector('#dialog-summary');
 const dialogBullets = document.querySelector('#dialog-bullets');
 const dialogRationale = document.querySelector('#dialog-rationale');
 const dialogDownload = document.querySelector('#dialog-download');
+const dialogLetter = document.querySelector('#dialog-letter');
+const dialogLetterLabel = document.querySelector('#dialog-letter-label');
 const dialogPrimary = document.querySelector('#dialog-primary');
 const closeDialogBtn = document.querySelector('#close-dialog');
 
@@ -162,7 +164,7 @@ function buildTags(match) {
 }
 
 // --- rendering ------------------------------------------------------------
-/** Signal band for a match score. 70 is Orbit's own strong-match cutoff. */
+/** Signal band for a match score. 70 is Gighunter's own strong-match cutoff. */
 function scoreBand(score) {
   if (score >= 90) return '3';
   if (score >= 70) return '2';
@@ -572,6 +574,14 @@ function openReviewDialog(application) {
   }
 
   dialogDownload.href = `/api/applications/${application.id}/resume.docx`;
+
+  // The server always renders a letter, so the link is never dead. What varies is whether it was
+  // written for this posting or assembled from the bullet library — say which, because a template
+  // letter needs its why-this-company paragraph rewritten before it goes anywhere.
+  dialogLetter.href = `/api/applications/${application.id}/cover-letter.docx`;
+  dialogLetterLabel.textContent = application.tailoring?.coverLetter
+    ? 'Cover letter'
+    : 'Cover letter (template — edit before sending)';
   dialogPrimary.textContent = application.status === 'approved' ? 'Open posting ↗' : 'Open application ↗';
   dialog.showModal();
 }
@@ -618,21 +628,56 @@ pauseAgentBtn.addEventListener('click', async () => {
   }
 });
 
-const SOURCE_TYPES = ['remotive', 'himalayas', 'adzuna', 'usajobs', 'rss'];
+/**
+ * Source types come from /api/sources/capabilities rather than a list kept here.
+ *
+ * The server already validates against SOURCE_TYPES and the capabilities record is typed to
+ * cover every one of them, so a hardcoded copy in the client can only ever drift: adding a
+ * connector server-side would leave the UI silently unable to offer it.
+ */
+let sourceCapabilities = null;
+
+async function loadSourceCapabilities() {
+  if (sourceCapabilities) return sourceCapabilities;
+  const { capabilities } = await getJSON('/api/sources/capabilities');
+  sourceCapabilities = capabilities;
+  return sourceCapabilities;
+}
+
+/** Flags a board where the search term is applied by Gighunter, not by the board itself. */
+function sourceTypeHint(type, caps) {
+  const notes = [];
+  if (caps?.authRequired) notes.push('needs an API key');
+  if (caps?.search === false && type !== 'rss') notes.push('filtered locally');
+  return notes.length ? ` (${notes.join(', ')})` : '';
+}
 
 addSourceBtn.addEventListener('click', async () => {
-  const type = prompt(`Source type — one of: ${SOURCE_TYPES.join(', ')}`, 'remotive');
-  if (!type) return;
-  if (!SOURCE_TYPES.includes(type.trim())) {
-    alert(`Unknown type "${type}". Must be one of: ${SOURCE_TYPES.join(', ')}`);
+  let capabilities;
+  try {
+    capabilities = await loadSourceCapabilities();
+  } catch (err) {
+    alert(`Could not load source types: ${err.message}`);
     return;
   }
+
+  const types = Object.keys(capabilities);
+  const menu = types.map(t => `  ${t}${sourceTypeHint(t, capabilities[t])}`).join('\n');
+
+  const type = prompt(`Source type — one of:\n\n${menu}\n`, 'remotive');
+  if (!type) return;
+  const chosen = type.trim();
+  if (!types.includes(chosen)) {
+    alert(`Unknown type "${type}". Must be one of: ${types.join(', ')}`);
+    return;
+  }
+
   const input = prompt(
-    type.trim() === 'rss' ? 'RSS/Atom feed URL' : 'Search keyword (e.g. "cloud security engineer")'
+    chosen === 'rss' ? 'RSS/Atom feed URL' : 'Search keyword (e.g. "cloud security engineer")'
   );
   if (!input) return;
   try {
-    await postJSON('/api/sources', { type: type.trim(), input });
+    await postJSON('/api/sources', { type: chosen, input });
     await loadSources();
   } catch (err) {
     alert(`Could not add source: ${err.message}`);

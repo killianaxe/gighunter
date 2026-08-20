@@ -1,7 +1,7 @@
 import { db } from './index.js';
 
 /**
- * App-level settings (how Orbit behaves), as opposed to the candidate profile (who you are).
+ * App-level settings (how Gighunter behaves), as opposed to the candidate profile (who you are).
  * Stored as text key/value pairs so new settings need no schema change.
  */
 export interface AppSettings {

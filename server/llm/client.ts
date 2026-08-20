@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 /**
- * Every LLM call in Orbit shares this client. The API key is read from ANTHROPIC_API_KEY
+ * Every LLM call in Gighunter shares this client. The API key is read from ANTHROPIC_API_KEY
  * (loaded from server/.env by env.ts) — the SDK resolves it from the environment, so it is
  * never passed around or logged.
  */

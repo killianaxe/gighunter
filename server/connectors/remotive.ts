@@ -1,6 +1,6 @@
 import type { NormalizedListing } from '../db/types.js';
 
-const USER_AGENT = 'Orbit/0.1 (+local job search assistant)';
+const USER_AGENT = 'Gighunter/0.1 (+local job search assistant)';
 
 interface RemotiveJob {
   id: number;

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Your own resume/CV files — drop them straight into this folder. Distinct from the
-// tailored .docx Orbit generates per application (server/pipeline/resume.ts).
+// tailored .docx Gighunter generates per application (server/pipeline/resume.ts).
 const documentsDir = resolve(__dirname, '..', 'data', 'documents');
 
 const CONTENT_TYPES: Record<string, string> = {

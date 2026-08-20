@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Tails Orbit's drafted-but-untailored applications through a headless Claude Code session.
+# Tails Gighunter's drafted-but-untailored applications through a headless Claude Code session.
 #
-# Why this exists: Orbit's server-side tailoring (server/llm/tailor.ts) bills Anthropic API
+# Why this exists: Gighunter's server-side tailoring (server/llm/tailor.ts) bills Anthropic API
 # credits. A Claude Code session bills the Pro subscription instead. So the reasoning moves out
-# of the server and into an agent that drives Orbit over MCP — same prompt, same schema, same
+# of the server and into an agent that drives Gighunter over MCP — same prompt, same schema, same
 # validation, different wallet.
 #
 # Usage:
 #   ./tailor-queue.sh          # work the whole backlog
 #   ./tailor-queue.sh 5        # stop after 5
 #
-# Requires: the autogighunter MCP server registered with Claude Code, and Orbit reachable.
+# Requires: the autogighunter MCP server registered with Claude Code, and Gighunter reachable.
 set -uo pipefail
 
 ORBIT="${ORBIT_BASE_URL:-http://127.0.0.1:3000}"
@@ -20,10 +20,10 @@ LIMIT="${1:-0}"
 GAP_SECONDS="${TAILOR_GAP_SECONDS:-20}"
 
 command -v claude >/dev/null || { echo "claude CLI not on PATH"; exit 1; }
-curl -sf -m 5 "$ORBIT/api/overview" >/dev/null || { echo "Orbit not reachable at $ORBIT"; exit 1; }
+curl -sf -m 5 "$ORBIT/api/overview" >/dev/null || { echo "Gighunter not reachable at $ORBIT"; exit 1; }
 
 # Drafted applications with no tailoring yet, highest score first.
-# Orbit has no "untailored" endpoint, so this reads each drafted application and filters here.
+# Gighunter has no "untailored" endpoint, so this reads each drafted application and filters here.
 export ORBIT
 QUEUE_RAW="$(
   curl -s "$ORBIT/api/matches" | python3 -c '
@@ -59,10 +59,10 @@ for row in "${QUEUE[@]}"; do
   IFS=$'\t' read -r job score label <<<"$row"
   printf '[%d/%d] %s%% %s ... ' "$((done_n + 1))" "$total" "$score" "${label:0:60}"
 
-  if (cd "$PROJECT_DIR" && claude -p "Tailor the resume for Orbit job $job.
+  if (cd "$PROJECT_DIR" && claude -p "Tailor the resume for Gighunter job $job.
 
 1. Call orbit_tailoring_context with that jobId. It returns the posting, the candidate's full
-   accomplishment library, and Orbit's honesty rules.
+   accomplishment library, and Gighunter's honesty rules.
 2. Follow those rules exactly. Never invent experience. Preserve every number, percentage, date,
    and proper noun verbatim. Only rephrase material the candidate actually wrote.
 3. Call orbit_save_tailoring with the jobId and your tailoring. Each bullet's sourceText must be

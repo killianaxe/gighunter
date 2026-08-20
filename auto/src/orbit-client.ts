@@ -24,6 +24,8 @@ export interface MatchEntry {
   rationale: string;
   applicationId: string | null;
   applicationStatus: 'drafted' | 'approved' | null;
+  /** When the tailored .docx last reached Telegram; null means it never has. */
+  resumeSentAt: string | null;
 }
 
 export interface ScanSummary {
@@ -47,11 +49,20 @@ export interface SourceEntry {
 
 export interface TailoringContext {
   job: { id: string; title: string; company: string; location: string | null; description: string | null };
-  /** The candidate's full material, formatted exactly as Orbit's own tailoring prompt formats it. */
+  /** The candidate's full material, formatted exactly as Gighunter's own tailoring prompt formats it. */
   candidateBrief: string;
-  /** Orbit's honesty constraints — never invent experience, preserve every metric verbatim. */
+  /** Gighunter's honesty constraints — never invent experience, preserve every metric verbatim. */
   rules: string;
   expectedShape: Record<string, string>;
+}
+
+export interface CoverLetter {
+  /** Null unless the posting itself names the hiring manager. Gighunter builds the greeting from it. */
+  recipient: string | null;
+  opening: string;
+  fitParagraph: string;
+  interestParagraph: string;
+  closingParagraph: string;
 }
 
 export interface TailoredApplication {
@@ -63,6 +74,7 @@ export interface TailoredApplication {
   keywordGaps: string[];
   coveredButUnstated: string[];
   fitAssessment: string;
+  coverLetter: CoverLetter;
 }
 
 export interface ApplicationDetail {
@@ -81,7 +93,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${config.orbitBaseUrl}${path}`, init);
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Orbit request ${path} failed: ${res.status} ${res.statusText} ${body}`.trim());
+    throw new Error(`Gighunter request ${path} failed: ${res.status} ${res.statusText} ${body}`.trim());
   }
   return (await res.json()) as T;
 }
@@ -125,11 +137,11 @@ export const orbit = {
 
   draftApplication: (jobId: string) => postJson<ApplicationDetail>(`/api/applications/${jobId}/draft`),
 
-  /** Job posting, candidate material, and Orbit's tailoring rules — everything needed in one call. */
+  /** Job posting, candidate material, and Gighunter's tailoring rules — everything needed in one call. */
   getTailoringContext: (jobId: string) =>
     request<TailoringContext>(`/api/applications/${jobId}/tailoring-context`),
 
-  /** Stores a tailoring. Orbit validates the shape and rejects a near-miss with 400 + issues. */
+  /** Stores a tailoring. Gighunter validates the shape and rejects a near-miss with 400 + issues. */
   saveTailoring: (jobId: string, tailoring: TailoredApplication) =>
     postJson<ApplicationDetail>(`/api/applications/${jobId}/tailoring`, tailoring),
 
@@ -137,7 +149,7 @@ export const orbit = {
 
   /**
    * Pushes the tailored .docx into the Telegram chat. The local download path is only reachable
-   * from the machine Orbit runs on, so this is what makes the resume available on a phone.
+   * from the machine Gighunter runs on, so this is what makes the resume available on a phone.
    */
   sendResumeToTelegram: (id: string) =>
     postJson<{ filename: string; bytes: number }>(`/api/applications/${id}/telegram`),
@@ -146,20 +158,42 @@ export const orbit = {
 
   getAuditLog: () => request<{ entries: unknown[] }>('/api/audit'),
 
-  /** Downloads the tailored .docx and saves it locally, using Orbit's own filename. Returns the saved path. */
+  /** Downloads the tailored .docx and saves it locally, using Gighunter's own filename. Returns the saved path. */
   downloadResume: async (applicationId: string): Promise<string> => {
-    const res = await fetch(`${config.orbitBaseUrl}/api/applications/${applicationId}/resume.docx`);
-    if (!res.ok) {
-      throw new Error(`Resume download failed: ${res.status} ${res.statusText}`);
-    }
-    const disposition = res.headers.get('content-disposition') ?? '';
-    const match = disposition.match(/filename="([^"]+)"/);
-    const filename = match ? match[1] : `${applicationId}.docx`;
+    const { path } = await downloadDocx(`/api/applications/${applicationId}/resume.docx`, applicationId, 'Resume');
+    return path;
+  },
 
-    mkdirSync(config.resumeDownloadDir, { recursive: true });
-    const destPath = resolve(config.resumeDownloadDir, filename);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    writeFileSync(destPath, buffer);
-    return destPath;
+  /**
+   * Downloads the .docx cover letter. `source` distinguishes an agent-written letter from the
+   * deterministic template Gighunter falls back to — the template is accurate but generic in its
+   * why-this-company paragraph, so the caller needs to know which one it got.
+   */
+  downloadCoverLetter: async (applicationId: string): Promise<{ path: string; source: 'tailored' | 'template' }> => {
+    const { path, source } = await downloadDocx(
+      `/api/applications/${applicationId}/cover-letter.docx`,
+      `${applicationId}-cover-letter`,
+      'Cover letter'
+    );
+    return { path, source: source === 'tailored' ? 'tailored' : 'template' };
   },
 };
+
+async function downloadDocx(
+  path: string,
+  fallbackName: string,
+  label: string
+): Promise<{ path: string; source: string | null }> {
+  const res = await fetch(`${config.orbitBaseUrl}${path}`);
+  if (!res.ok) {
+    throw new Error(`${label} download failed: ${res.status} ${res.statusText}`);
+  }
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match ? match[1] : `${fallbackName}.docx`;
+
+  mkdirSync(config.resumeDownloadDir, { recursive: true });
+  const destPath = resolve(config.resumeDownloadDir, filename);
+  writeFileSync(destPath, Buffer.from(await res.arrayBuffer()));
+  return { path: destPath, source: res.headers.get('x-letter-source') };
+}

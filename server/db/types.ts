@@ -87,7 +87,10 @@ export function candidateFromRow(row: CandidateRow): Candidate {
   };
 }
 
-export const SOURCE_TYPES = ['remotive', 'rss', 'adzuna', 'himalayas', 'usajobs'] as const;
+export const SOURCE_TYPES = [
+  'remotive', 'rss', 'adzuna', 'himalayas', 'usajobs',
+  'remoteok', 'arbeitnow', 'jobicy', 'themuse', 'jooble',
+] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 
 export interface SourceRow {
@@ -135,6 +138,8 @@ export interface ApplicationRow {
   draft_summary: string | null;
   draft_bullets_json: string;
   tailoring_json: string | null;
+  /** When the tailored .docx was last pushed to Telegram; null means never. */
+  resume_sent_at: string | null;
   created_at: string;
   decided_at: string | null;
 }

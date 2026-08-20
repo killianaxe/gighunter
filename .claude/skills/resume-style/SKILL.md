@@ -1,11 +1,11 @@
 ---
 name: resume-style
-description: Typographic and structural rules for the .docx resumes Orbit generates (server/pipeline/resume.ts). Use whenever changing resume rendering, layout, fonts, spacing, section order, or page length — and before adding any visual element, because ATS parsing constrains what is safe.
+description: Typographic and structural rules for the .docx resumes Gighunter generates (server/pipeline/resume.ts). Use whenever changing resume rendering, layout, fonts, spacing, section order, or page length — and before adding any visual element, because ATS parsing constrains what is safe.
 ---
 
 # Resume rendering rules
 
-Orbit generates one tailored `.docx` per application in `server/pipeline/resume.ts` using the
+Gighunter generates one tailored `.docx` per application in `server/pipeline/resume.ts` using the
 `docx` npm package. These documents are read first by an applicant tracking system and only then
 by a human, which is what constrains every decision below.
 
