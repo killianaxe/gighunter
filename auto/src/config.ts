@@ -44,4 +44,21 @@ export const config = {
   autoDraftThreshold: num(process.env.AUTO_DRAFT_THRESHOLD, 70),
   resumeDownloadDir: resolve(projectRoot, str(process.env.RESUME_DOWNLOAD_DIR, './downloads')),
   logsDir: resolve(projectRoot, 'logs'),
+
+  /**
+   * Whether each cycle runs the tailoring queue before it downloads and delivers.
+   *
+   * On by default: without it the scheduler ships the deterministic keyword draft forever, and
+   * the whole MCP-over-Pro route only ever fires when someone runs a script by hand. Set
+   * AUTO_TAILOR=false to fall back to that older behaviour.
+   */
+  autoTailor: bool(process.env.AUTO_TAILOR, true),
+  /** Concurrent headless Claude sessions. Each is one posting; the work is embarrassingly parallel. */
+  tailorConcurrency: num(process.env.TAILOR_JOBS, 4),
+  /**
+   * Most applications tailored per cycle. Pro allowance is windowed, so a large backlog drains
+   * over several cycles instead of burning the window in one burst.
+   */
+  tailorBatchLimit: num(process.env.TAILOR_BATCH_LIMIT, 10),
+  tailorTimeoutMinutes: num(process.env.TAILOR_TIMEOUT_MINUTES, 30),
 };

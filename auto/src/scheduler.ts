@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { config } from './config.js';
 import { ensureOrbitRunning } from './ensure-orbit.js';
 import { orbit } from './orbit-client.js';
+import { runTailorQueue } from './tailor.js';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
@@ -38,6 +39,17 @@ async function runCycle(): Promise<void> {
     return;
   }
 
+  /**
+   * Phase 1 — make sure every undelivered match has an application row.
+   *
+   * The cycle runs as three passes rather than one loop because the ordering is load-bearing.
+   * The tailoring queue builds its work list from applications that already exist, so drafting
+   * has to happen first. And the .docx renders from whatever tailoring is stored at the moment
+   * it is downloaded, so tailoring has to finish before the download — otherwise every delivery
+   * ships the mechanical keyword draft regardless of how good a tailoring lands a second later.
+   */
+  const prepared: { match: (typeof undelivered)[number]; applicationId: string }[] = [];
+
   for (const match of undelivered) {
     try {
       /**
@@ -53,9 +65,36 @@ async function runCycle(): Promise<void> {
        * approved rows alike, so the guard has to be explicit.
        */
       const applicationId = match.applicationId ?? (await orbit.draftApplication(match.jobId)).id;
-      const verb = match.applicationId ? 'Prepared' : 'Auto-drafted';
+      if (!match.applicationId) {
+        log(`Drafted "${match.title}" @ ${match.company} (${match.score}%)`);
+      }
+      prepared.push({ match, applicationId });
+    } catch (err) {
+      log(`Failed to prepare "${match.title}" @ ${match.company}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  if (prepared.length === 0) {
+    log('Cycle complete: nothing could be prepared.');
+    return;
+  }
+
+  /**
+   * Phase 2 — write real tailorings, so what gets delivered is the intelligent tier rather than
+   * the keyword draft. Bounded per cycle; see config.tailorBatchLimit.
+   */
+  const tailoring = await runTailorQueue();
+  if (tailoring.skipped) {
+    log(`Tailoring skipped (${tailoring.skipped}).`);
+  } else if (tailoring.summary) {
+    log(`Tailoring: ${tailoring.summary}.`);
+  }
+
+  /** Phase 3 — render the documents from whatever tailoring now exists, and deliver them. */
+  for (const { match, applicationId } of prepared) {
+    try {
       const resumePath = await orbit.downloadResume(applicationId);
-      log(`${verb} "${match.title}" @ ${match.company} (${match.score}%) → ${resumePath}`);
+      log(`Prepared "${match.title}" @ ${match.company} (${match.score}%) → ${resumePath}`);
 
       // The cover letter is a separate artifact and a separate failure. It is saved even when it
       // is only the deterministic template, because a generic letter that needs one paragraph
@@ -94,7 +133,7 @@ async function runCycle(): Promise<void> {
         }
       }
     } catch (err) {
-      log(`Failed to auto-draft "${match.title}" @ ${match.company}: ${err instanceof Error ? err.message : err}`);
+      log(`Failed to deliver "${match.title}" @ ${match.company}: ${err instanceof Error ? err.message : err}`);
     }
   }
 }
