@@ -35,6 +35,9 @@ const unnotifiedStrongMatches = db.prepare(`
   WHERE m.candidate_id = ?
     AND m.score >= ?
     AND j.notified_at IS NULL
+    -- A dismissed posting must not arrive on the phone. Announcing something the candidate has
+    -- already rejected is the fastest way to make the digest ignorable.
+    AND j.dismissed_at IS NULL
   ORDER BY m.score DESC
 `);
 

@@ -63,19 +63,40 @@ export function migrateCandidatesColumns(db: Database.Database): void {
 }
 
 /**
- * Adds jobs.notified_at to existing databases. New tables are handled by schema.sql's
+ * Adds columns to jobs on existing databases. New tables are handled by schema.sql's
  * CREATE TABLE IF NOT EXISTS, but that statement is a no-op against an existing table,
  * so added columns always need an explicit ALTER here.
  *
- * Backfilled to datetime('now') for every job already on file: those predate the notifier,
- * and announcing a few hundred historical matches on first launch would be worse than useless.
+ * Each column is checked independently. This used to early-return once notified_at existed,
+ * which silently made the function un-extendable: every database that had already booted once
+ * would skip any column added below it, forever, with no error. Per-column checks are the only
+ * shape that survives a second addition.
  */
 export function migrateJobsColumns(db: Database.Database): void {
   const existing = new Set((db.prepare(`PRAGMA table_info(jobs)`).all() as { name: string }[]).map(c => c.name));
-  if (existing.has('notified_at')) return;
 
-  db.exec(`ALTER TABLE jobs ADD COLUMN notified_at TEXT`);
-  db.exec(`UPDATE jobs SET notified_at = datetime('now')`);
+  /**
+   * Backfilled to datetime('now') for every job already on file: those predate the notifier,
+   * and announcing a few hundred historical matches on first launch would be worse than useless.
+   */
+  if (!existing.has('notified_at')) {
+    db.exec(`ALTER TABLE jobs ADD COLUMN notified_at TEXT`);
+    db.exec(`UPDATE jobs SET notified_at = datetime('now')`);
+  }
+
+  /**
+   * When the candidate dismissed this posting. NULL means it is still in play.
+   *
+   * Deliberately on jobs rather than matches, for the same reason notified_at is: rescoreAll()
+   * deletes and rebuilds every match row, so a flag stored there would be erased on the next
+   * rescore and the dismissed posting would silently return. jobs is the durable table; matches
+   * is a derived cache.
+   *
+   * Backfills to NULL — nothing is dismissed retroactively.
+   */
+  if (!existing.has('dismissed_at')) {
+    db.exec(`ALTER TABLE jobs ADD COLUMN dismissed_at TEXT`);
+  }
 }
 
 /**

@@ -8,6 +8,7 @@ import { auditRoutes } from './audit.js';
 import { documentsRoutes } from './documents.js';
 import { profileRoutes } from './profile.js';
 import { pipelineRoutes } from './pipeline.js';
+import { jobsRoutes } from './jobs.js';
 
 export async function registerRoutes(app: FastifyInstance) {
   await app.register(overviewRoutes);
@@ -19,4 +20,5 @@ export async function registerRoutes(app: FastifyInstance) {
   await app.register(documentsRoutes);
   await app.register(profileRoutes);
   await app.register(pipelineRoutes);
+  await app.register(jobsRoutes);
 }

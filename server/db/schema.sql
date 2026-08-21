@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   -- rescoreAll() deletes and rebuilds every match row, which would clear the flag and
   -- re-announce the entire backlog on the next scan.
   notified_at TEXT,
+  -- Set when the candidate dismisses the posting; NULL means still in play. On jobs for the same
+  -- reason notified_at is: rescoreAll() rebuilds every match row, so a flag kept there would be
+  -- erased and the dismissed posting would quietly reappear.
+  dismissed_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

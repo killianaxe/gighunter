@@ -19,6 +19,7 @@ const activityGoalFill = document.querySelector('#activity-goal-fill');
 
 const matchesEl = document.querySelector('#matches');
 const matchesTotal = document.querySelector('#matches-total');
+const queueToggle = document.querySelector('#queue-toggle');
 const navMatchesCount = document.querySelector('#nav-matches-count');
 
 const sourcesHeading = document.querySelector('#sources-heading');
@@ -220,7 +221,18 @@ function createJobCard(match) {
   btn.className = 'apply-btn';
   btn.dataset.jobId = match.jobId;
   btn.textContent = match.applicationStatus === 'approved' ? 'Approved ✓' : 'Review';
-  action.append(small, btn);
+
+  // Dismiss is deliberately quiet — a small × rather than a second primary button. It is the
+  // action taken most often and the one that matters least when right, so it should not compete
+  // with Review for attention.
+  const dismiss = document.createElement('button');
+  dismiss.className = 'dismiss-btn';
+  dismiss.dataset.jobId = match.jobId;
+  dismiss.title = 'Dismiss — hides it everywhere, including the Telegram digest. Reversible.';
+  dismiss.setAttribute('aria-label', `Dismiss ${match.title} at ${match.company}`);
+  dismiss.textContent = '×';
+
+  action.append(small, btn, dismiss);
 
   card.append(logo, info, action);
   return card;
@@ -329,11 +341,33 @@ async function loadActivity() {
   activityGoalFill.style.width = `${Math.round((data.thisWeek / Math.max(data.thisWeek, data.priorWeek, 1)) * 100)}%`;
 }
 
+/**
+ * Cards below this score are hidden behind the "show all" toggle.
+ *
+ * 50 is where Orbit's own bands stop meaning "worth a look". Roughly seven in ten scored jobs
+ * fall under it, and rendering them built several hundred DOM nodes nobody reads — the queue is
+ * for triage, and a triage list you have to scroll past 600 rejects to use is not one.
+ */
+const QUEUE_SCORE_FLOOR = 50;
+let showAllMatches = false;
+
 async function loadMatches() {
   const { matches } = await getJSON('/api/matches');
   matchesById = new Map(matches.map(m => [m.jobId, m]));
+
+  const visible = showAllMatches ? matches : matches.filter(m => m.score >= QUEUE_SCORE_FLOOR);
+  const hidden = matches.length - visible.length;
+
   matchesTotal.textContent = matches.length;
   navMatchesCount.textContent = matches.length;
+
+  if (queueToggle) {
+    queueToggle.hidden = hidden === 0 && !showAllMatches;
+    queueToggle.textContent = showAllMatches
+      ? `Hide below ${QUEUE_SCORE_FLOOR}%`
+      : `Show ${hidden} below ${QUEUE_SCORE_FLOOR}%`;
+  }
+
   matchesEl.innerHTML = '';
   if (matches.length === 0) {
     const p = document.createElement('p');
@@ -342,7 +376,23 @@ async function loadMatches() {
     matchesEl.append(p);
     return;
   }
-  for (const match of matches) matchesEl.append(createJobCard(match));
+  if (visible.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'empty-state';
+    p.textContent = `Nothing at or above ${QUEUE_SCORE_FLOOR}% — use "Show ${hidden} below ${QUEUE_SCORE_FLOOR}%" to see the rest.`;
+    matchesEl.append(p);
+    return;
+  }
+  for (const match of visible) matchesEl.append(createJobCard(match));
+}
+
+/** Dismiss a posting, then refresh so it leaves the queue immediately. */
+async function dismissJob(jobId) {
+  const res = await fetch(`/api/jobs/${jobId}/dismiss`, { method: 'POST' });
+  if (!res.ok) return;
+  await loadMatches();
+  // The overview counts strong matches, and one just left the pool.
+  loadOverview?.();
 }
 
 async function loadSources() {
@@ -685,6 +735,20 @@ addSourceBtn.addEventListener('click', async () => {
 });
 
 matchesEl.addEventListener('click', async event => {
+  // Dismiss is checked first: both buttons live in the same .job-action, and a click that
+  // matched neither must fall through untouched.
+  const dismiss = event.target.closest('.dismiss-btn');
+  if (dismiss) {
+    dismiss.disabled = true;
+    try {
+      await dismissJob(dismiss.dataset.jobId);
+    } catch (err) {
+      dismiss.disabled = false;
+      alert(`Could not dismiss: ${err.message}`);
+    }
+    return;
+  }
+
   const btn = event.target.closest('.apply-btn');
   if (!btn) return;
   const jobId = btn.dataset.jobId;
@@ -698,6 +762,11 @@ matchesEl.addEventListener('click', async event => {
   } finally {
     btn.disabled = false;
   }
+});
+
+queueToggle?.addEventListener('click', async () => {
+  showAllMatches = !showAllMatches;
+  await loadMatches();
 });
 
 locationsAddBtn.addEventListener('click', () => addTagFromInput(locationsInput, 'locations'));

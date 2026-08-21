@@ -117,6 +117,8 @@ export interface JobRow {
   salary_max: number | null;
   posted_at: string | null;
   normalized_key: string;
+  /** When the candidate dismissed this posting; null means it is still in play. */
+  dismissed_at: string | null;
   created_at: string;
 }
 

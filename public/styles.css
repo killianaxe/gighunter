@@ -286,6 +286,26 @@ h3{font-size:14px;margin:0;font-weight:600;letter-spacing:-.2px}
   transition:border-color .15s,background .15s;
 }
 .apply-btn:hover:not(:disabled){border-color:var(--blue);color:var(--blue)}
+
+/* Dismiss sits under Review, deliberately recessive: no border, faint until hovered. It is the
+   most-used control on the card and the least consequential, so it must not read as an equal
+   to the primary action. Warm colour on hover marks it as the destructive-ish one. */
+.dismiss-btn{
+  background:none;border:none;padding:2px 6px;margin-top:6px;align-self:flex-end;
+  font:400 15px var(--display);line-height:1;color:var(--faint);cursor:pointer;
+  border-radius:var(--r-sm);transition:color .15s,background .15s;
+}
+.dismiss-btn:hover:not(:disabled){color:var(--warn);background:#ffffff0a}
+.dismiss-btn:disabled{opacity:.4;cursor:default}
+
+/* Reveals the sub-floor matches. Sits between the heading and "View all". */
+.queue-toggle{
+  background:none;border:1px solid var(--grid);border-radius:var(--r-sm);
+  font:400 10px var(--mono);letter-spacing:.04em;padding:5px 10px;
+  color:var(--dim);cursor:pointer;margin-left:auto;margin-right:14px;
+  transition:border-color .15s,color .15s;
+}
+.queue-toggle:hover{border-color:var(--edge);color:var(--text)}
 .job-action .apply-btn:disabled{opacity:.35;cursor:default}
 
 /* ----------------------------------------------------------- side rail ---- */
